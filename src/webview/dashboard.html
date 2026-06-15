@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="{{LOCALE}}">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>{{STYLES}}</style>
+</head>
+<body class="{{BODY_CLASS}}">
+  <div class="shell">
+    <div class="topbar">
+      <button class="settings-fab secondary" onclick="openSettings()" aria-label="{{SETTINGS_LABEL}}">⚙</button>
+    </div>
+    <div class="header">
+      <div>
+        <div class="brand-kicker">{{APP_NAME}}</div>
+        <h1>{{DASHBOARD_TITLE}}</h1>
+        <div class="subtitle">{{DASHBOARD_SUBTITLE}}</div>
+      </div>
+      <div class="actions">
+        <button onclick="send('addAccount')">{{ADD_ACCOUNT}}</button>
+        <button class="secondary" onclick="send('importJson')">{{IMPORT_EXPORT_JSON}}</button>
+        <button class="secondary" onclick="send('refreshAll')">{{REFRESH_ALL}}</button>
+      </div>
+    </div>
+
+    <div class="summary">
+      <div class="summary-card">
+        <div class="summary-label">{{SAVED_ACCOUNTS}}</div>
+        <div class="summary-value">{{ACCOUNT_COUNT}}</div>
+        <div class="summary-detail">{{ACCOUNTS_IN_WORKSPACE}}</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">{{ACTIVE_ACCOUNTS}}</div>
+        <div class="summary-value">{{ACTIVE_COUNT}}</div>
+        <div class="summary-detail">{{ACTIVE_HINT}}</div>
+      </div>
+    </div>
+
+    <div class="account-list">
+      {{ACCOUNT_CARDS}}
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="settingsModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <h2 id="settingsTitle">{{SETTINGS_TITLE}}</h2>
+      <div class="field-grid">
+        <div class="field">
+          <label for="themeSelect">{{THEME_LABEL}}</label>
+          <select id="themeSelect">
+            <option value="auto" {{THEME_AUTO_SELECTED}}>{{THEME_AUTO}}</option>
+            <option value="vscode" {{THEME_VSCODE_SELECTED}}>{{THEME_VSCODE}}</option>
+            <option value="dark" {{THEME_DARK_SELECTED}}>{{THEME_DARK}}</option>
+            <option value="light" {{THEME_LIGHT_SELECTED}}>{{THEME_LIGHT}}</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="localeSelect">{{LANGUAGE_LABEL}}</label>
+          <select id="localeSelect">
+            <option value="en" {{LOCALE_EN_SELECTED}}>{{LANGUAGE_EN}}</option>
+            <option value="ko" {{LOCALE_KO_SELECTED}}>{{LANGUAGE_KO}}</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="secondary" onclick="closeSettings()">{{CANCEL}}</button>
+        <button onclick="applySettings()">{{APPLY}}</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="{{SCRIPT_PATH}}"></script>
+</body>
+</html>

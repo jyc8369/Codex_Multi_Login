@@ -5,6 +5,7 @@ import { CodexTokens } from "../types";
 
 export interface CodexAuthFile {
   OPENAI_API_KEY: string | null;
+  email?: string;
   tokens: {
     id_token: string;
     access_token: string;
@@ -32,10 +33,11 @@ export async function readAuthFile(): Promise<CodexAuthFile | undefined> {
   }
 }
 
-export async function writeAuthFile(tokens: CodexTokens): Promise<void> {
+export async function writeAuthFile(tokens: CodexTokens, email?: string): Promise<void> {
   await fs.mkdir(getCodexHome(), { recursive: true });
   const payload: CodexAuthFile = {
     OPENAI_API_KEY: null,
+    email,
     tokens: {
       id_token: tokens.idToken,
       access_token: tokens.accessToken,

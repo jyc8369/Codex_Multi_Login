@@ -56,10 +56,11 @@ async function readAuthFile() {
         return undefined;
     }
 }
-async function writeAuthFile(tokens) {
+async function writeAuthFile(tokens, email) {
     await fs.mkdir(getCodexHome(), { recursive: true });
     const payload = {
         OPENAI_API_KEY: null,
+        email,
         tokens: {
             id_token: tokens.idToken,
             access_token: tokens.accessToken,

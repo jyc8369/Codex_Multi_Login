@@ -10,6 +10,9 @@ OUTPUT_VSIX="$EXTENSION_DIR/${EXTENSION_NAME}-${EXTENSION_VERSION}.vsix"
 cd "$ROOT_DIR"
 npm run compile
 
+mkdir -p "$EXTENSION_DIR/out"
+cp -R "$ROOT_DIR/out/." "$EXTENSION_DIR/out/"
+
 cd "$EXTENSION_DIR"
 npx vsce package --allow-missing-repository --no-dependencies
 

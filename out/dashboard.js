@@ -34,12 +34,15 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DashboardPanel = void 0;
+const fs = __importStar(require("fs"));
+const path = __importStar(require("path"));
 const vscode = __importStar(require("vscode"));
+const localization_1 = require("./localization");
 class DashboardPanel {
     constructor(context) {
         this.context = context;
     }
-    show(accounts, onMessage) {
+    show(accounts, settings, onMessage) {
         if (!this.panel) {
             this.panel = vscode.window.createWebviewPanel("codexMultiLoginDashboard", "Codex Multi login", vscode.ViewColumn.One, { enableScripts: true });
             this.panel.onDidDispose(() => {
@@ -47,53 +50,199 @@ class DashboardPanel {
             });
             this.panel.webview.onDidReceiveMessage((message) => onMessage(message));
         }
-        this.panel.webview.html = this.render(accounts);
+        this.panel.webview.html = this.render(this.panel.webview, accounts, settings);
     }
-    render(accounts) {
-        const rows = accounts
-            .map((account) => `
-          <tr>
-            <td>${escapeHtml(account.email)}</td>
-            <td>${escapeHtml(account.planType ?? "-")}</td>
-            <td>${account.isActive ? "active" : ""}</td>
-            <td>${account.quotaSummary ? `${account.quotaSummary.hourlyPercentage}% / ${account.quotaSummary.weeklyPercentage}%` : "-"}</td>
-          </tr>`)
-            .join("");
-        return `<!doctype html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <style>
-          body { font-family: system-ui, sans-serif; padding: 16px; background: linear-gradient(180deg, #0f172a, #111827); color: #e5e7eb; }
-          button { margin-right: 8px; margin-bottom: 8px; }
-          table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-          th, td { border-bottom: 1px solid #334155; padding: 8px; text-align: left; }
-          .actions { margin-bottom: 12px; }
-        </style>
-      </head>
-      <body>
-        <h1>Codex Multi login</h1>
-        <div class="actions">
-          <button onclick="send('addAccount')">Add Account</button>
-          <button onclick="send('importCurrentAuth')">Import auth.json</button>
-          <button onclick="send('refreshAll')">Refresh All</button>
-        </div>
-        <table>
-          <thead>
-            <tr><th>Email</th><th>Plan</th><th>State</th><th>Quota</th></tr>
-          </thead>
-          <tbody>${rows || "<tr><td colspan='4'>No accounts yet.</td></tr>"}</tbody>
-        </table>
-        <script>
-          const vscode = acquireVsCodeApi();
-          function send(command) { vscode.postMessage({ command }); }
-        </script>
-      </body>
-      </html>`;
+    render(webview, accounts, settings) {
+        const cards = accounts.map((account) => renderAccountCard(account, settings.locale)).join("");
+        const activeCount = accounts.filter((account) => account.isActive).length;
+        const activeTheme = vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Light ? "theme-light" : "theme-dark";
+        const bodyThemeClass = settings.theme === "light" ? "theme-light" : settings.theme === "dark" ? "theme-dark" : activeTheme;
+        const html = readAsset("dashboard.html");
+        const styles = readAsset("dashboard.css");
+        const scriptPath = webview.asWebviewUri(vscode.Uri.file(path.join(__dirname, "webview", "dashboard.js"))).toString();
+        return html
+            .split("{{LOCALE}}").join(settings.locale)
+            .split("{{BODY_CLASS}}").join(bodyThemeClass)
+            .split("{{SETTINGS_LABEL}}").join(`${(0, localization_1.t)(settings.locale, "theme")} / ${(0, localization_1.t)(settings.locale, "language")}`)
+            .split("{{APP_NAME}}").join((0, localization_1.t)(settings.locale, "appName"))
+            .split("{{DASHBOARD_TITLE}}").join((0, localization_1.t)(settings.locale, "dashboardTitle"))
+            .split("{{DASHBOARD_SUBTITLE}}").join((0, localization_1.t)(settings.locale, "dashboardSubtitle"))
+            .split("{{ADD_ACCOUNT}}").join((0, localization_1.t)(settings.locale, "addAccount"))
+            .split("{{IMPORT_EXPORT_JSON}}").join((0, localization_1.t)(settings.locale, "importExportJson"))
+            .split("{{REFRESH_ALL}}").join((0, localization_1.t)(settings.locale, "refreshAll"))
+            .split("{{SAVED_ACCOUNTS}}").join((0, localization_1.t)(settings.locale, "savedAccounts"))
+            .split("{{ACTIVE_ACCOUNTS}}").join((0, localization_1.t)(settings.locale, "activeAccounts"))
+            .split("{{ACCOUNTS_IN_WORKSPACE}}").join((0, localization_1.t)(settings.locale, "accountsInWorkspace"))
+            .split("{{ACTIVE_HINT}}").join((0, localization_1.t)(settings.locale, "activeHint"))
+            .split("{{ACCOUNT_COUNT}}").join(String(accounts.length))
+            .split("{{ACTIVE_COUNT}}").join(String(activeCount))
+            .split("{{ACCOUNT_CARDS}}").join(cards || `<div class="empty">${(0, localization_1.t)(settings.locale, "noAccounts")}</div>`)
+            .split("{{SETTINGS_TITLE}}").join(`${(0, localization_1.t)(settings.locale, "theme")} / ${(0, localization_1.t)(settings.locale, "language")}`)
+            .split("{{THEME_LABEL}}").join((0, localization_1.t)(settings.locale, "theme"))
+            .split("{{THEME_AUTO}}").join((0, localization_1.t)(settings.locale, "auto"))
+            .split("{{THEME_VSCODE}}").join((0, localization_1.t)(settings.locale, "vscode"))
+            .split("{{THEME_DARK}}").join((0, localization_1.t)(settings.locale, "dark"))
+            .split("{{THEME_LIGHT}}").join((0, localization_1.t)(settings.locale, "light"))
+            .split("{{LANGUAGE_LABEL}}").join((0, localization_1.t)(settings.locale, "language"))
+            .split("{{LANGUAGE_EN}}").join((0, localization_1.t)(settings.locale, "english"))
+            .split("{{LANGUAGE_KO}}").join((0, localization_1.t)(settings.locale, "korean"))
+            .split("{{CANCEL}}").join((0, localization_1.t)(settings.locale, "cancel"))
+            .split("{{APPLY}}").join((0, localization_1.t)(settings.locale, "apply"))
+            .split("{{THEME_AUTO_SELECTED}}").join(settings.theme === "auto" ? "selected" : "")
+            .split("{{THEME_VSCODE_SELECTED}}").join(settings.theme === "vscode" ? "selected" : "")
+            .split("{{THEME_DARK_SELECTED}}").join(settings.theme === "dark" ? "selected" : "")
+            .split("{{THEME_LIGHT_SELECTED}}").join(settings.theme === "light" ? "selected" : "")
+            .split("{{LOCALE_EN_SELECTED}}").join(settings.locale === "en" ? "selected" : "")
+            .split("{{LOCALE_KO_SELECTED}}").join(settings.locale === "ko" ? "selected" : "")
+            .split("{{STYLES}}").join(styles)
+            .split("{{SCRIPT_PATH}}").join(scriptPath.toString());
     }
 }
 exports.DashboardPanel = DashboardPanel;
+function readAsset(fileName) {
+    const assetPath = path.join(__dirname, "webview", fileName);
+    return fs.readFileSync(assetPath, "utf8");
+}
+function renderAccountCard(account, locale) {
+    const quota = account.quotaSummary;
+    const planClass = planClassName(account.planType);
+    const stateClass = account.isActive ? "status-active" : "status-inactive";
+    const cardClass = account.isActive ? "account-card active" : "account-card inactive";
+    const planContext = planQuotaContext(account.planType, locale);
+    return `
+    <div class="${cardClass}">
+      <div class="card-head">
+        <span class="email">${escapeHtml(account.email)}</span>
+        <span class="pill ${planClass}">${escapeHtml((account.planType ?? "unknown").toUpperCase())}</span>
+        <span class="pill ${stateClass}">${account.isActive ? "ACTIVE" : "INACTIVE"}</span>
+        ${renderCreditBadge(quota?.credits, locale)}
+        <span class="card-actions">
+          <button class="card-action secondary" onclick="send('switchAccount', '${escapeJs(account.id)}')">${(0, localization_1.t)(locale, "switchAccount")}</button>
+          <button class="card-action secondary" onclick="send('refreshAccount', '${escapeJs(account.id)}')">${(0, localization_1.t)(locale, "refresh")}</button>
+          <button class="card-action secondary" onclick="send('deleteAccount', '${escapeJs(account.id)}')">${(0, localization_1.t)(locale, "delete")}</button>
+        </span>
+      </div>
+      <div class="metrics-row">
+        ${renderMetricCard("5-hour limit", quota?.hourlyWindowPresent ? quota.hourlyPercentage : undefined, "bar-green", renderQuotaCardMeta(quota?.hourlyWindowPresent, quota?.hourlyWindowMinutes, quota?.hourlyResetTime, quota?.hourlyRequestsLeft, quota?.hourlyRequestsLimit, planContext.hourly, locale))}
+        ${renderMetricCard("Weekly limit", quota?.weeklyWindowPresent ? quota.weeklyPercentage : undefined, "bar-yellow", renderQuotaCardMeta(quota?.weeklyWindowPresent, quota?.weeklyWindowMinutes, quota?.weeklyResetTime, quota?.weeklyRequestsLeft, quota?.weeklyRequestsLimit, planContext.weekly, locale))}
+        ${renderMetricCard("Months limit", quota?.monthlyWindowPresent ? quota.monthlyPercentage : undefined, "bar-blue", renderQuotaCardMeta(quota?.monthlyWindowPresent, quota?.monthlyWindowMinutes, quota?.monthlyResetTime, quota?.monthlyRequestsLeft, quota?.monthlyRequestsLimit, planContext.monthly, locale))}
+        ${renderMetricCard("Code review", quota?.codeReviewWindowPresent ? quota.codeReviewPercentage : undefined, "bar-orange", renderQuotaCardMeta(quota?.codeReviewWindowPresent, quota?.codeReviewWindowMinutes, quota?.codeReviewResetTime, quota?.codeReviewRequestsLeft, quota?.codeReviewRequestsLimit, (0, localization_1.t)(locale, "codeReviewUnavailable"), locale))}
+      </div>
+      ${quota?.additionalRateLimits?.length ? renderMoreDetails(quota.additionalRateLimits, locale) : ""}
+    </div>`;
+}
+function renderMetricCard(label, percentage, barClass = "bar-blue", meta = "No data") {
+    const value = typeof percentage === "number" ? `${Math.max(0, Math.min(100, Math.round(percentage)))}%` : "-";
+    const width = typeof percentage === "number" ? Math.max(0, Math.min(100, Math.round(percentage))) : 0;
+    const effectiveBarClass = typeof percentage === "number" ? colorBarClassFromPercentage(width) : barClass;
+    return `
+    <div class="metric">
+      <div class="metric-label">${escapeHtml(label)}</div>
+      <div class="metric-value ${value === "-" ? "muted" : colorClassFromPercentage(width)}">${escapeHtml(value)}</div>
+      <div class="metric-bar"><span class="${effectiveBarClass}" style="width:${width}%"></span></div>
+      <div class="metric-meta">${escapeHtml(meta)}</div>
+    </div>`;
+}
+function renderMoreDetails(limits, locale) {
+    return `
+    <details class="more">
+      <summary>${(0, localization_1.t)(locale, "showAdditionalLimits")}</summary>
+      <div class="more-body">
+        <div class="extra-list">
+          ${limits.map((limit) => renderLimitCard(limit)).join("")}
+        </div>
+      </div>
+    </details>`;
+}
+function renderLimitCard(limit) {
+    return `
+    <div class="extra-row">
+      <span class="extra-name">${escapeHtml(limit.limitName)}${limit.meteredFeature ? ` · ${escapeHtml(limit.meteredFeature)}` : ""}</span>
+      <span class="extra-value">5h ${formatLimitValue(limit.hourlyPercentage)} · Week ${formatLimitValue(limit.weeklyPercentage)}</span>
+      <span class="extra-meta">${escapeHtml(renderWindowMeta(limit.hourlyWindowMinutes, limit.hourlyResetTime, limit.hourlyRequestsLeft, limit.hourlyRequestsLimit))}</span>
+    </div>`;
+}
+function formatLimitValue(value) {
+    return typeof value === "number" ? `${Math.max(0, Math.min(100, Math.round(value)))}%` : "-";
+}
+function renderWindowMeta(windowMinutes, resetTime, requestsLeft, requestsLimit) {
+    const parts = [];
+    if (typeof requestsLeft === "number" && typeof requestsLimit === "number") {
+        parts.push(`${requestsLeft}/${requestsLimit} remaining`);
+    }
+    if (typeof windowMinutes === "number") {
+        parts.push(`${windowMinutes}m`);
+    }
+    if (typeof resetTime === "number") {
+        parts.push(`reset ${new Date(resetTime * 1000).toLocaleString()}`);
+    }
+    return parts.length ? parts.join(" · ") : "No window data";
+}
+function renderQuotaMeta(windowMinutes, resetTime, requestsLeft, requestsLimit) {
+    return renderWindowMeta(windowMinutes, resetTime, requestsLeft, requestsLimit);
+}
+function renderQuotaCardMeta(present, windowMinutes, resetTime, requestsLeft, requestsLimit, missingMessage, locale = "en") {
+    if (present) {
+        return renderQuotaMeta(windowMinutes, resetTime, requestsLeft, requestsLimit);
+    }
+    return missingMessage ?? (0, localization_1.t)(locale, "noDataReturned");
+}
+function planQuotaContext(planType, locale) {
+    const plan = (planType ?? "unknown").toLowerCase();
+    if (plan.includes("free")) {
+        return {
+            hourly: (0, localization_1.t)(locale, "notProvidedFree"),
+            weekly: (0, localization_1.t)(locale, "notProvidedFree"),
+            monthly: locale === "ko" ? "월간 쿼터가 무료 플랜의 주요 한도입니다." : "Monthly quota is the primary limit on the Free plan."
+        };
+    }
+    if (plan.includes("plus")) {
+        return {
+            hourly: (0, localization_1.t)(locale, "noDataReturned"),
+            weekly: (0, localization_1.t)(locale, "noDataReturned"),
+            monthly: (0, localization_1.t)(locale, "notProvidedPlus")
+        };
+    }
+    return { hourly: (0, localization_1.t)(locale, "noDataReturned"), weekly: (0, localization_1.t)(locale, "noDataReturned"), monthly: (0, localization_1.t)(locale, "noDataReturned") };
+}
+function renderCreditBadge(credits, locale = "en") {
+    if (!credits) {
+        return `<span class="pill credit-none">${(0, localization_1.t)(locale, "creditsNone")}</span>`;
+    }
+    if (credits.unlimited) {
+        return `<span class="pill credit-unlimited">${(0, localization_1.t)(locale, "creditsUnlimited")}</span>`;
+    }
+    if (credits.hasCredits) {
+        return `<span class="pill credit-available">${escapeHtml(credits.balance || (0, localization_1.t)(locale, "creditsAvailable"))}</span>`;
+    }
+    return `<span class="pill credit-none">${(0, localization_1.t)(locale, "creditsNone")}</span>`;
+}
+function planClassName(planType) {
+    const plan = (planType ?? "unknown").toLowerCase();
+    if (plan.includes("pro"))
+        return "plan-pro";
+    if (plan.includes("plus"))
+        return "plan-plus";
+    return "plan-free";
+}
+function colorClassFromPercentage(value) {
+    if (value >= 80)
+        return "color-green";
+    if (value >= 50)
+        return "color-yellow";
+    if (value >= 20)
+        return "color-orange";
+    return "color-red";
+}
+function colorBarClassFromPercentage(value) {
+    if (value >= 80)
+        return "bar-green";
+    if (value >= 50)
+        return "bar-yellow";
+    if (value >= 20)
+        return "bar-orange";
+    return "bar-red";
+}
 function escapeHtml(input) {
     return input.replace(/[&<>"']/g, (ch) => {
         switch (ch) {
@@ -105,5 +254,8 @@ function escapeHtml(input) {
             default: return ch;
         }
     });
+}
+function escapeJs(input) {
+    return input.replace(/[\\'"]/g, (ch) => `\\${ch}`);
 }
 //# sourceMappingURL=dashboard.js.map

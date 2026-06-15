@@ -108,7 +108,10 @@ function readWindow(raw: RateLimitWindow): ParsedWindow {
   };
 }
 
-function resolveRateLimitWindows(rateLimit: Record<string, unknown> | undefined): {
+function resolveRateLimitWindows(
+  rateLimit: Record<string, unknown> | undefined,
+  planType?: string
+): {
   hourly?: ParsedWindow;
   weekly?: ParsedWindow;
   monthly?: ParsedWindow;
@@ -117,11 +120,18 @@ function resolveRateLimitWindows(rateLimit: Record<string, unknown> | undefined)
     return {};
   }
 
+  const plan = (planType ?? "").toLowerCase();
   const primary = readWindow(asRecord(rateLimit["primary_window"]) ?? asRecord(rateLimit["primaryWindow"]));
   const secondary = readWindow(asRecord(rateLimit["secondary_window"]) ?? asRecord(rateLimit["secondaryWindow"]));
   const windows = [primary, secondary].filter((window) => window.present);
   if (!windows.length) {
     return {};
+  }
+
+  if (plan.includes("free")) {
+    return {
+      monthly: primary.present ? primary : secondary.present ? secondary : undefined
+    };
   }
 
   const sorted = windows.slice().sort((a, b) => (a.windowMinutes ?? 0) - (b.windowMinutes ?? 0));
@@ -227,8 +237,9 @@ export async function refreshQuota(
   }
 
   const raw = (await response.json()) as Record<string, unknown>;
+  const planType = String(raw["plan_type"] ?? raw["planType"] ?? "").toLowerCase();
   const rateLimit = asRecord(raw["rate_limit"]) ?? asRecord(raw["rateLimit"]);
-  const windows = resolveRateLimitWindows(rateLimit);
+  const windows = resolveRateLimitWindows(rateLimit, planType);
   const primaryWindow = windows.hourly;
   const secondaryWindow = windows.weekly;
   const monthlyWindow = windows.monthly;
@@ -241,7 +252,9 @@ export async function refreshQuota(
   const codeReview = codeReviewWindows.hourly ?? codeReviewWindows.weekly ?? readWindow(codeReviewRateLimit);
   const monthlyRateLimit = asRecord(raw["monthly_rate_limit"]) ?? asRecord(raw["monthlyRateLimit"]);
   const monthlyWindows = parseRateLimitObject(monthlyRateLimit);
-  const monthly = monthlyWindows.hourly ?? monthlyWindows.weekly ?? readWindow(monthlyRateLimit);
+  const monthly = planType.includes("free")
+    ? monthlyWindow ?? monthlyWindows.hourly ?? monthlyWindows.weekly ?? readWindow(monthlyRateLimit)
+    : monthlyWindows.hourly ?? monthlyWindows.weekly ?? readWindow(monthlyRateLimit);
 
   if (logger) {
     logger.appendLine(
