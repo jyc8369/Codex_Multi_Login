@@ -3,11 +3,11 @@
   "displayName": "Codex Multi Login",
   "description": "Lightweight VS Code extension for managing multiple Codex accounts, switching auth.json, and checking quota.",
   "version": "0.1.0",
-  "publisher": "local-personal-use",
+  "publisher": "jyc8369",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://example.com/local/codex-multi-login.git"
+    "url": "https://github.com/jyc8369/codex_multi_login.git"
   },
   "engines": {
     "vscode": "^1.96.0"

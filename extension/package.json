@@ -3,11 +3,11 @@
   "displayName": "Codex Multi Login",
   "description": "Lightweight VS Code extension for managing multiple Codex accounts, switching auth.json, and checking quota.",
   "version": "0.1.0",
-  "publisher": "local-personal-use",
+  "publisher": "jyc8369",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://example.com/local/codex-multi-login.git"
+    "url": "https://github.com/jyc8369/codex_multi_login.git"
   },
   "engines": {
     "vscode": "^1.96.0"
@@ -18,6 +18,8 @@
   "files": [
     "out/**",
     "README.md",
+    "STORAGE.md",
+    "JSON_FORMAT.md",
     "LICENSE",
     "package.json"
   ],
@@ -25,8 +27,9 @@
     "commands": [
       { "command": "codexMultiLogin.openDashboard", "title": "Codex Multi Login: Open Dashboard" },
       { "command": "codexMultiLogin.addAccount", "title": "Codex Multi Login: Add Account via OAuth" },
-      { "command": "codexMultiLogin.importCurrentAuth", "title": "Codex Multi Login: Import Current auth.json" },
+      { "command": "codexMultiLogin.importJson", "title": "Codex Multi Login: Import / Export JSON" },
       { "command": "codexMultiLogin.switchAccount", "title": "Codex Multi Login: Switch Account" },
+      { "command": "codexMultiLogin.deleteAccount", "title": "Codex Multi Login: Delete Account" },
       { "command": "codexMultiLogin.refreshQuota", "title": "Codex Multi Login: Refresh Quota" },
       { "command": "codexMultiLogin.refreshAllQuotas", "title": "Codex Multi Login: Refresh All Quotas" }
     ]
