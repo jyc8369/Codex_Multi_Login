@@ -56,7 +56,7 @@ function readWindow(raw) {
         percentage = clampPercent(directPercentage);
     }
     else if (typeof usedPercent === "number") {
-        percentage = usedPercent <= 1 ? clampPercent(100 - usedPercent * 100) : clampPercent(100 - usedPercent);
+        percentage = clampPercent(100 - usedPercent);
     }
     else if (typeof remaining === "number" && typeof limit === "number" && limit > 0) {
         percentage = clampPercent((remaining / limit) * 100);
