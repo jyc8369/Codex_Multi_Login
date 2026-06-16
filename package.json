@@ -2,7 +2,7 @@
   "name": "codex-multi-login",
   "displayName": "Codex Multi Login",
   "description": "Lightweight VS Code extension for managing multiple Codex accounts, switching auth.json, and checking quota.",
-  "version": "1.0.6",
+  "version": "1.0.8",
   "publisher": "jyc8369",
   "license": "MIT",
   "repository": {
@@ -12,9 +12,13 @@
   "engines": {
     "vscode": "^1.96.0"
   },
-  "categories": ["Other"],
+  "categories": [
+    "Other"
+  ],
   "icon": "icon.png",
-  "activationEvents": ["onStartupFinished"],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./out/extension.js",
   "browser": "./out/browser/extension.js",
   "files": [
@@ -25,21 +29,57 @@
   ],
   "contributes": {
     "commands": [
-      { "command": "codexMultiLogin.openDashboard", "title": "Codex Multi Login: Open Dashboard" },
-      { "command": "codexMultiLogin.addAccount", "title": "Codex Multi Login: Add Account via OAuth" },
-      { "command": "codexMultiLogin.importCurrentAuth", "title": "Codex Multi Login: Import Current auth.json" },
-      { "command": "codexMultiLogin.switchAccount", "title": "Codex Multi Login: Switch Account" },
-      { "command": "codexMultiLogin.refreshQuota", "title": "Codex Multi Login: Refresh Quota" },
-      { "command": "codexMultiLogin.refreshAllQuotas", "title": "Codex Multi Login: Refresh All Quotas" }
+      {
+        "command": "codexMultiLogin.openDashboard",
+        "title": "Codex Multi Login: Open Dashboard"
+      },
+      {
+        "command": "codexMultiLogin.addAccount",
+        "title": "Codex Multi Login: Add Account via OAuth"
+      },
+      {
+        "command": "codexMultiLogin.importCurrentAuth",
+        "title": "Codex Multi Login: Import Current auth.json"
+      },
+      {
+        "command": "codexMultiLogin.switchAccount",
+        "title": "Codex Multi Login: Switch Account"
+      },
+      {
+        "command": "codexMultiLogin.refreshQuota",
+        "title": "Codex Multi Login: Refresh Quota"
+      },
+      {
+        "command": "codexMultiLogin.refreshAllQuotas",
+        "title": "Codex Multi Login: Refresh All Quotas"
+      }
     ],
     "menus": {
       "commandPalette": [
-        { "command": "codexMultiLogin.openDashboard", "when": "true" },
-        { "command": "codexMultiLogin.addAccount", "when": "!isWeb" },
-        { "command": "codexMultiLogin.importCurrentAuth", "when": "!isWeb" },
-        { "command": "codexMultiLogin.switchAccount", "when": "!isWeb" },
-        { "command": "codexMultiLogin.refreshQuota", "when": "!isWeb" },
-        { "command": "codexMultiLogin.refreshAllQuotas", "when": "!isWeb" }
+        {
+          "command": "codexMultiLogin.openDashboard",
+          "when": "true"
+        },
+        {
+          "command": "codexMultiLogin.addAccount",
+          "when": "!isWeb"
+        },
+        {
+          "command": "codexMultiLogin.importCurrentAuth",
+          "when": "!isWeb"
+        },
+        {
+          "command": "codexMultiLogin.switchAccount",
+          "when": "!isWeb"
+        },
+        {
+          "command": "codexMultiLogin.refreshQuota",
+          "when": "!isWeb"
+        },
+        {
+          "command": "codexMultiLogin.refreshAllQuotas",
+          "when": "!isWeb"
+        }
       ]
     },
     "configuration": {
@@ -47,19 +87,30 @@
       "properties": {
         "codexMultiLogin.dashboardTheme": {
           "type": "string",
-          "enum": ["auto", "vscode", "dark", "light"],
+          "enum": [
+            "auto",
+            "vscode",
+            "dark",
+            "light"
+          ],
           "default": "auto",
           "markdownDescription": "Dashboard theme. Use VS Code to sync with the current editor theme."
         },
         "codexMultiLogin.dashboardLocale": {
           "type": "string",
-          "enum": ["en", "ko"],
+          "enum": [
+            "en",
+            "ko"
+          ],
           "default": "en",
           "markdownDescription": "Dashboard language."
         },
         "codexMultiLogin.storageMode": {
           "type": "string",
-          "enum": ["keychain", "plaintext"],
+          "enum": [
+            "keychain",
+            "plaintext"
+          ],
           "default": "keychain",
           "markdownDescription": "Token storage mode. Keychain is recommended."
         }

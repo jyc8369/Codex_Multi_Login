@@ -63,6 +63,18 @@ log() {
   printf '[package] %s\n' "$*"
 }
 
+bump_versions() {
+  local next_root_version next_extension_version
+
+  next_root_version="$(node -p "const [major, minor, patch] = require('./package.json').version.split('.').map(Number); \`\${major}.\${minor}.\${patch + 1}\`")"
+  next_extension_version="$(node -p "const [major, minor, patch] = require('./extension/package.json').version.split('.').map(Number); \`\${major}.\${minor}.\${patch + 1}\`")"
+
+  node -e "const fs = require('fs'); const root = JSON.parse(fs.readFileSync('./package.json', 'utf8')); root.version = process.argv[1]; fs.writeFileSync('./package.json', JSON.stringify(root, null, 2) + '\n');" "$next_root_version"
+  node -e "const fs = require('fs'); const ext = JSON.parse(fs.readFileSync('./extension/package.json', 'utf8')); ext.version = process.argv[1]; fs.writeFileSync('./extension/package.json', JSON.stringify(ext, null, 2) + '\n');" "$next_extension_version"
+
+  log "bumped versions root=v$next_root_version extension=v$next_extension_version"
+}
+
 copy_webview_assets() {
   rm -rf "$ROOT_DIR/out/webview" "$EXTENSION_DIR/out"
   mkdir -p "$ROOT_DIR/out" "$EXTENSION_DIR"
@@ -108,6 +120,8 @@ publish_extension() {
   else
     log "no VSIX archive was left behind by vsce publish"
   fi
+
+  bump_versions
 }
 
 log "root=$ROOT_DIR"

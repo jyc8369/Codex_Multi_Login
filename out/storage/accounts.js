@@ -35,39 +35,34 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AccountsStore = void 0;
 const fs = __importStar(require("fs/promises"));
-const path = __importStar(require("path"));
 const authFile_1 = require("../codex/authFile");
 const oauth_1 = require("../auth/oauth");
 const quota_1 = require("../services/quota");
 const jwt_1 = require("../utils/jwt");
-const ACCOUNT_FILE = "account.json";
-const TOKENS_FILE = "tokens.json";
-const STORAGE_MODE_KEY = "codexMultiLogin.storageMode";
-const TOKEN_SECRET_PREFIX = "codexMultiLogin.tokens.";
+const accountFiles_1 = require("./accountFiles");
 class AccountsStore {
     constructor(context, logger) {
         this.context = context;
         this.logger = logger;
-        this.accountPath = path.join(context.globalStorageUri.fsPath, ACCOUNT_FILE);
-        this.tokensPath = path.join(context.globalStorageUri.fsPath, TOKENS_FILE);
+        this.files = new accountFiles_1.AccountFileStore(context, logger);
     }
     async init() {
-        await fs.mkdir(this.context.globalStorageUri.fsPath, { recursive: true });
+        await this.files.ensureStorageRoot();
         await this.syncActiveAccountFromAuthFile();
-        await this.ensureAccountFiles();
+        await this.files.ensureAccountFiles();
         await this.migrateStorageIfNeeded();
-        this.log("info", `init storage=${this.context.globalStorageUri.fsPath} mode=${this.getConfiguredStorageMode()} backend=${await this.getStorageBackend()} accountFile=${this.accountPath}`);
+        this.log("info", `init storage=${this.context.globalStorageUri.fsPath} mode=${this.getConfiguredStorageMode()} backend=${await this.getStorageBackend()} accountFile=${this.files.getAccountPath()}`);
     }
     getStorageMode() {
         return this.getConfiguredStorageMode();
     }
     async updateStorageMode(mode) {
         this.log("info", `updateStorageMode requested mode=${mode}`);
-        await this.context.globalState.update(STORAGE_MODE_KEY, mode);
+        await this.context.globalState.update("codexMultiLogin.storageMode", mode);
         await this.migrateStorageIfNeeded(true);
     }
     async list() {
-        return await this.readIndex();
+        return this.readIndex();
     }
     async purgeMissingCredentials() {
         const index = await this.readIndex();
@@ -76,7 +71,7 @@ class AccountsStore {
             return 0;
         }
         const remaining = index.filter((account) => !account.credentialsMissing);
-        await this.writeIndex(remaining.map((item) => this.stripTokens(item)), this.findCurrentAccountId(remaining));
+        await this.files.writeIndex(remaining.map((item) => this.stripTokens(item)), this.findCurrentAccountId(remaining));
         for (const account of missing) {
             await this.context.secrets.delete(this.storageKeyForAccount(account));
             await this.deletePlaintextToken(account);
@@ -104,7 +99,7 @@ class AccountsStore {
         };
         const accounts = index.filter((item) => item.id !== id);
         accounts.push(this.stripTokens(record));
-        await this.writeIndex(accounts, markActive ? id : undefined);
+        await this.files.writeIndex(accounts, markActive ? id : undefined);
         await this.writeTokens(record, tokens, record.email);
         if (markActive) {
             await (0, authFile_1.writeAuthFile)(tokens, record.email);
@@ -162,7 +157,7 @@ class AccountsStore {
         }
         await (0, authFile_1.writeAuthFile)(record.tokens, record.email);
         this.log("info", `switchAccount wrote auth.json email=${record.email} accountId=${record.accountId ?? "unknown"}`);
-        await this.writeIndex(index.map((item) => this.stripTokens({
+        await this.files.writeIndex(index.map((item) => this.stripTokens({
             ...item,
             isActive: item.id === accountId,
             updatedAt: item.id === accountId ? Date.now() : item.updatedAt
@@ -177,7 +172,7 @@ class AccountsStore {
         }
         const remaining = index.filter((item) => item.id !== accountId);
         const nextCurrentAccountId = record.id === accountId ? remaining.find((item) => item.id !== accountId)?.id : undefined;
-        await this.writeIndex(remaining.map((item) => this.stripTokens({
+        await this.files.writeIndex(remaining.map((item) => this.stripTokens({
             ...item,
             isActive: item.id === nextCurrentAccountId
         })), nextCurrentAccountId);
@@ -209,7 +204,7 @@ class AccountsStore {
         const adjustedTargetIndex = currentIndex < targetIndex ? targetIndex - 1 : targetIndex;
         const insertIndex = placement === "before" ? adjustedTargetIndex : adjustedTargetIndex + 1;
         index.splice(insertIndex, 0, moved);
-        await this.writeIndex(index.map((item) => this.stripTokens(item)), this.findCurrentAccountId(index));
+        await this.files.writeIndex(index.map((item) => this.stripTokens(item)), this.findCurrentAccountId(index));
         this.log("info", `moveAccount id=${accountId} target=${targetAccountId} placement=${placement} from=${currentIndex} to=${insertIndex}`);
         return index.map((item) => this.rehydrateRecord(item));
     }
@@ -240,7 +235,7 @@ class AccountsStore {
             await this.writeTokens(record, tokens, record.email);
             const replaced = index.map((item) => this.stripTokens(item.id === accountId ? updated : item));
             this.log("info", `refreshAccount writeIndex id=${record.id}`);
-            await this.writeIndex(replaced, this.findCurrentAccountId(replaced));
+            await this.files.writeIndex(replaced, this.findCurrentAccountId(replaced));
             if (record.isActive) {
                 this.log("info", `refreshAccount writeAuthJson id=${record.id}`);
                 await (0, authFile_1.writeAuthFile)(tokens, record.email);
@@ -269,7 +264,7 @@ class AccountsStore {
     }
     async readIndex() {
         try {
-            const meta = await this.readIndexMeta();
+            const meta = await this.files.readIndexMeta();
             const storedTokens = await this.readStoredTokens(meta.accounts);
             const activeAccountId = this.activeAccountIdFromAuthFile;
             const activeEmail = this.activeEmailFromAuthFile;
@@ -285,56 +280,6 @@ class AccountsStore {
             return [];
         }
     }
-    async writeIndex(accounts, currentAccountId) {
-        const payload = { currentAccountId, accounts };
-        await this.writeIndexFile(this.accountPath, payload);
-    }
-    async readIndexMeta() {
-        const primary = await this.readIndexFile(this.accountPath);
-        if (primary) {
-            return primary;
-        }
-        const legacy = await this.readIndexFile(path.join(this.context.globalStorageUri.fsPath, "accounts.json"));
-        if (legacy) {
-            return legacy;
-        }
-        return { currentAccountId: undefined, accounts: [] };
-    }
-    async ensureAccountFiles() {
-        const primary = await this.readIndexFile(this.accountPath);
-        const legacyPath = path.join(this.context.globalStorageUri.fsPath, "accounts.json");
-        const legacy = await this.readIndexFile(legacyPath);
-        const resolved = primary ?? legacy ?? { currentAccountId: undefined, accounts: [] };
-        if (!primary) {
-            await this.writeIndexFile(this.accountPath, resolved);
-            this.log("info", `ensureAccountFiles created account.json accounts=${resolved.accounts.length}`);
-        }
-        if (legacy) {
-            await fs.rm(legacyPath, { force: true });
-            this.log("info", "ensureAccountFiles removed legacy accounts.json");
-        }
-    }
-    async readIndexFile(filePath) {
-        try {
-            const raw = await fs.readFile(filePath, "utf8");
-            const parsed = JSON.parse(raw);
-            return {
-                currentAccountId: parsed.currentAccountId,
-                accounts: Array.isArray(parsed.accounts)
-                    ? parsed.accounts.map((account) => ({
-                        ...account,
-                        storageKey: account.storageKey ?? this.secretKey(account.id)
-                    }))
-                    : []
-            };
-        }
-        catch {
-            return undefined;
-        }
-    }
-    async writeIndexFile(filePath, payload) {
-        await fs.writeFile(filePath, JSON.stringify(payload, null, 2), "utf8");
-    }
     async writeTokens(account, tokens, email) {
         const mode = this.getConfiguredStorageMode();
         const storageKey = this.storageKeyForAccount(account);
@@ -346,10 +291,10 @@ class AccountsStore {
             await this.deletePlaintextToken(account);
             return;
         }
-        const current = await this.readPlaintextTokens();
+        const current = await this.files.readPlaintextTokens();
         current[storageKey] = { tokens, email };
-        await fs.writeFile(this.tokensPath, JSON.stringify(current, null, 2), "utf8");
-        this.log("info", `writeTokens plaintext id=${account.id} email=${email ?? "none"} key=${storageKey} path=${this.tokensPath}`);
+        await this.files.writePlaintextTokens(current);
+        this.log("info", `writeTokens plaintext id=${account.id} email=${email ?? "none"} key=${storageKey}`);
         await this.context.secrets.delete(storageKey);
     }
     async deleteTokens(account) {
@@ -358,12 +303,12 @@ class AccountsStore {
         await this.deletePlaintextToken(account);
     }
     async deletePlaintextToken(account) {
-        const current = await this.readPlaintextTokens();
+        const current = await this.files.readPlaintextTokens();
         const storageKey = this.storageKeyForAccount(account);
         if (current[storageKey] || current[account.id]) {
             delete current[storageKey];
             delete current[account.id];
-            await fs.writeFile(this.tokensPath, JSON.stringify(current, null, 2), "utf8");
+            await this.files.writePlaintextTokens(current);
         }
     }
     async readStoredTokens(accounts) {
@@ -371,20 +316,11 @@ class AccountsStore {
         if (mode === "keychain") {
             return this.readKeychainTokens(accounts);
         }
-        return this.readPlaintextTokens();
-    }
-    async readPlaintextTokens() {
-        try {
-            const raw = await fs.readFile(this.tokensPath, "utf8");
-            return JSON.parse(raw);
-        }
-        catch {
-            return {};
-        }
+        return this.files.readPlaintextTokens();
     }
     async readKeychainTokens(accounts) {
         const result = {};
-        const resolvedAccounts = accounts ?? (await this.readIndexMeta()).accounts;
+        const resolvedAccounts = accounts ?? (await this.files.readIndexMeta()).accounts;
         for (const account of resolvedAccounts) {
             const storageKey = this.storageKeyForAccount(account);
             const raw = await this.context.secrets.get(storageKey);
@@ -408,8 +344,8 @@ class AccountsStore {
     }
     async migrateStorageIfNeeded(force = false) {
         const mode = this.getConfiguredStorageMode();
-        const meta = await this.readIndexMeta().catch(() => ({ currentAccountId: undefined, accounts: [] }));
-        const hasPlaintext = await this.hasPlaintextTokens();
+        const meta = await this.files.readIndexMeta().catch(() => ({ currentAccountId: undefined, accounts: [] }));
+        const hasPlaintext = await this.files.hasPlaintextTokens();
         const hasKeychain = await this.hasKeychainTokens();
         const currentMode = hasKeychain && !hasPlaintext ? "keychain" : hasPlaintext && !hasKeychain ? "plaintext" : mode;
         this.log("info", `migrateStorageIfNeeded mode=${mode} current=${currentMode} hasKeychain=${hasKeychain} hasPlaintext=${hasPlaintext} force=${force}`);
@@ -420,7 +356,7 @@ class AccountsStore {
             return;
         }
         const index = meta.accounts;
-        const stored = currentMode === "keychain" ? await this.readKeychainTokens(index) : await this.readPlaintextTokens();
+        const stored = currentMode === "keychain" ? await this.readKeychainTokens(index) : await this.files.readPlaintextTokens();
         for (const account of index) {
             const storageKey = this.storageKeyForAccount(account);
             const record = stored[storageKey] ?? stored[account.id];
@@ -429,7 +365,7 @@ class AccountsStore {
             await this.writeTokens(account, record.tokens, record.email ?? account.email);
         }
         if (mode === "keychain") {
-            await fs.rm(this.tokensPath, { force: true });
+            await this.files.removePlaintextTokens();
         }
         else {
             for (const account of index) {
@@ -438,17 +374,8 @@ class AccountsStore {
         }
         this.log("info", `migrateStorageIfNeeded from=${currentMode} to=${mode} count=${index.length}`);
     }
-    async hasPlaintextTokens() {
-        try {
-            const raw = await fs.readFile(this.tokensPath, "utf8");
-            return raw.trim().length > 0;
-        }
-        catch {
-            return false;
-        }
-    }
     async hasKeychainTokens() {
-        const index = await this.readIndexMeta();
+        const index = await this.files.readIndexMeta();
         for (const account of index.accounts) {
             if (await this.context.secrets.get(this.storageKeyForAccount(account))) {
                 return true;
@@ -457,11 +384,11 @@ class AccountsStore {
         return false;
     }
     getConfiguredStorageMode() {
-        return this.context.globalState.get(STORAGE_MODE_KEY) === "plaintext" ? "plaintext" : "keychain";
+        return this.files.getConfiguredStorageMode();
     }
     async getStorageBackend() {
         const configured = this.getConfiguredStorageMode();
-        const hasPlaintext = await this.hasPlaintextTokens();
+        const hasPlaintext = await this.files.hasPlaintextTokens();
         const hasKeychain = await this.hasKeychainTokens();
         if (hasPlaintext && !hasKeychain) {
             return "plaintext";
@@ -472,23 +399,21 @@ class AccountsStore {
         return configured;
     }
     secretKey(accountId) {
-        return `${TOKEN_SECRET_PREFIX}${accountId}`;
+        return this.files.secretKey(accountId);
     }
     storageKeyForAccount(account) {
         return account.storageKey ?? this.secretKey(account.id);
     }
     hydrateRecord(stored, tokens, email, activeAccountId, activeEmail) {
-        const account = {
+        return {
             ...stored,
             email,
             tokens,
             credentialsMissing: !tokens,
             isActive: this.matchesActiveIdentity({ email, accountId: stored.accountId }, activeAccountId, activeEmail)
         };
-        return account;
     }
     stripTokens(account) {
-        // Persist metadata only; tokens live in the selected storage backend.
         const { tokens: _tokens, credentialsMissing: _credentialsMissing, ...rest } = account;
         return {
             ...rest,
