@@ -16,11 +16,11 @@
         <h1>{{DASHBOARD_TITLE}}</h1>
         <div class="subtitle">{{DASHBOARD_SUBTITLE}}</div>
       </div>
-      <div class="actions">
-        <button onclick="send('addAccount')">{{ADD_ACCOUNT}}</button>
-        <button class="secondary" onclick="send('importJson')">{{IMPORT_EXPORT_JSON}}</button>
-        <button class="secondary" onclick="send('refreshAll')">{{REFRESH_ALL}}</button>
-      </div>
+    <div class="actions">
+      <button onclick="send('addAccount')">{{ADD_ACCOUNT}}</button>
+      <button class="secondary" onclick="send('importJson')">{{IMPORT_EXPORT_JSON}}</button>
+      <button class="secondary" onclick="send('refreshAll')">{{REFRESH_ALL}}</button>
+    </div>
     </div>
 
     <div class="summary">
@@ -73,9 +73,24 @@
         </div>
       </div>
       <div class="modal-actions">
-        <button id="editModeButton" class="secondary" data-label-enter="{{EDIT_MODE_ENTER}}" data-label-exit="{{EDIT_MODE_EXIT}}" onclick="toggleEditMode()">{{EDIT_MODE_ENTER}}</button>
+        <button id="editModeButton" class="secondary" data-label-enter="{{EDIT_MODE_ENTER}}" data-label-exit="{{EDIT_MODE_EXIT}}" onclick="openEditMode()">{{EDIT_MODE_ENTER}}</button>
         <button class="secondary" onclick="closeSettings()">{{CANCEL}}</button>
         <button onclick="applySettings()">{{APPLY}}</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop edit-backdrop" id="editModal" aria-hidden="true">
+    <div class="edit-shell" role="dialog" aria-modal="true" aria-labelledby="editTitle">
+      <div class="edit-header">
+        <div>
+          <h2 id="editTitle">{{EDIT_PANEL_TITLE}}</h2>
+          <div class="edit-subtitle">{{EDIT_PANEL_SUBTITLE}}</div>
+        </div>
+        <button class="secondary" onclick="closeEditMode()">{{EDIT_CLOSE}}</button>
+      </div>
+      <div class="edit-list">
+        {{EDIT_ACCOUNT_CARDS}}
       </div>
     </div>
   </div>

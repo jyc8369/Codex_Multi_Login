@@ -60,6 +60,7 @@ class DashboardPanel {
     }
     render(webview, accounts, settings) {
         const cards = accounts.map((account) => renderAccountCardHtml(account, settings.locale)).join("");
+        const editCards = accounts.map((account) => renderEditAccountCardHtml(account)).join("");
         const activeCount = accounts.filter((account) => account.isActive).length;
         const missingCount = accounts.filter((account) => account.credentialsMissing).length;
         const activeTheme = vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Light ? "theme-light" : "theme-dark";
@@ -88,6 +89,7 @@ class DashboardPanel {
             ? `<div class="notice notice-danger">${escapeHtml(`${(0, localization_1.t)(settings.locale, "credentialsMissing")} (${missingCount}) - ${(0, localization_1.t)(settings.locale, "credentialsMissingNotice")}`)}</div>`
             : "")
             .split("{{ACCOUNT_CARDS}}").join(cards || `<div class="empty">${(0, localization_1.t)(settings.locale, "noAccounts")}</div>`)
+            .split("{{EDIT_ACCOUNT_CARDS}}").join(editCards || `<div class="empty">${(0, localization_1.t)(settings.locale, "noAccounts")}</div>`)
             .split("{{SETTINGS_TITLE}}").join(`${(0, localization_1.t)(settings.locale, "theme")} / ${(0, localization_1.t)(settings.locale, "language")}`)
             .split("{{THEME_LABEL}}").join((0, localization_1.t)(settings.locale, "theme"))
             .split("{{THEME_AUTO}}").join((0, localization_1.t)(settings.locale, "auto"))
@@ -105,6 +107,9 @@ class DashboardPanel {
             .split("{{EDIT_MODE_ENTER}}").join((0, localization_1.t)(settings.locale, "editModeEnter"))
             .split("{{EDIT_MODE_EXIT}}").join((0, localization_1.t)(settings.locale, "editModeExit"))
             .split("{{EDIT_MODE_HINT}}").join((0, localization_1.t)(settings.locale, "editModeHint"))
+            .split("{{EDIT_PANEL_TITLE}}").join((0, localization_1.t)(settings.locale, "editModePanelTitle"))
+            .split("{{EDIT_PANEL_SUBTITLE}}").join((0, localization_1.t)(settings.locale, "editModePanelSubtitle"))
+            .split("{{EDIT_CLOSE}}").join((0, localization_1.t)(settings.locale, "cancel"))
             .split("{{THEME_AUTO_SELECTED}}").join(settings.theme === "auto" ? "selected" : "")
             .split("{{THEME_VSCODE_SELECTED}}").join(settings.theme === "vscode" ? "selected" : "")
             .split("{{THEME_DARK_SELECTED}}").join(settings.theme === "dark" ? "selected" : "")
@@ -141,7 +146,7 @@ function renderAccountCardHtml(account, locale, refreshState = "idle", refreshEr
         ? `<div class="refresh-banner">${escapeHtml(refreshError || (0, localization_1.t)(locale, "refreshFailed"))}</div>`
         : "";
     return `
-    <div class="${[cardClass, refreshClass].filter(Boolean).join(" ")}" draggable="true" data-account-id="${escapeHtml(account.id)}" data-refresh-state="${refreshState}">
+    <div class="${[cardClass, refreshClass].filter(Boolean).join(" ")}" data-account-id="${escapeHtml(account.id)}" data-refresh-state="${refreshState}">
       <div class="card-head">
         <span class="email">${escapeHtml(account.email)}</span>
         <span class="pill ${planClass}">${escapeHtml((account.planType ?? "unknown").toUpperCase())}</span>
@@ -162,6 +167,27 @@ function renderAccountCardHtml(account, locale, refreshState = "idle", refreshEr
         ${renderMetricCard("Code review", quota?.codeReviewWindowPresent ? quota.codeReviewPercentage : undefined, "bar-orange", renderQuotaCardMeta(quota?.codeReviewWindowPresent, quota?.codeReviewWindowMinutes, quota?.codeReviewResetTime, quota?.codeReviewRequestsLeft, quota?.codeReviewRequestsLimit, (0, localization_1.t)(locale, "codeReviewUnavailable"), locale))}
       </div>
       ${quota?.additionalRateLimits?.length ? renderMoreDetails(quota.additionalRateLimits, locale) : ""}
+    </div>`;
+}
+function renderEditAccountCardHtml(account) {
+    const plan = (account.planType ?? "unknown").toUpperCase();
+    const state = account.isActive ? "ACTIVE" : "INACTIVE";
+    const credit = account.quotaSummary?.credits;
+    const creditText = credit
+        ? credit.unlimited
+            ? "UNLIMITED"
+            : credit.hasCredits
+                ? credit.balance || "- 크레딧"
+                : "- 크레딧"
+        : "- 크레딧";
+    return `
+    <div class="edit-account-card" draggable="true" data-account-id="${escapeHtml(account.id)}">
+      <div class="edit-account-email">${escapeHtml(account.email)}</div>
+      <div class="edit-account-meta">
+        <span class="edit-account-pill">${escapeHtml(plan)}</span>
+        <span class="edit-account-pill">${escapeHtml(state)}</span>
+        <span class="edit-account-credit">${escapeHtml(creditText)}</span>
+      </div>
     </div>`;
 }
 function renderMetricCard(label, percentage, barClass = "bar-blue", meta = "No data") {
