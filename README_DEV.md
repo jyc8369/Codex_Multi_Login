@@ -1,6 +1,106 @@
+[English](#english) | [한국어](#korean)
+
+<a name="english"></a>
 # Codex Multi Login - Developer Guide
 
-[English](README_DEV.md) | [한국어](README_DEV_KO.md)
+This document explains the structure and behavior of the `Codex Multi Login` extension for developers.
+
+## Project goals
+
+- Manage multiple Codex accounts in one place.
+- Switch the active `auth.json` safely.
+- Check saved tokens and quota status in the dashboard.
+- Provide the available feature set in VS Code Web as well.
+
+## Current scope
+
+- Add account
+- JSON import/export
+- Switch account
+- Refresh quota
+- Render the dashboard
+- Split behavior between web host and desktop host
+
+## Core files
+
+- `src/extension.ts`: extension entry point, command registration, and state switching
+- `src/dashboard.ts`: dashboard UI rendering and message handling
+- `src/storage/accounts.ts`: account storage, lookup, and cleanup
+- `src/storage/config.ts`: settings storage
+- `src/auth/oauth.ts`: OAuth session handling
+- `src/localization.ts`: locale and theme normalization
+- `package.json`: commands, settings, and build scripts
+- `extension/`: packaged extension metadata
+- `out/`: compiled output
+
+## Architecture
+
+### Storage layer
+
+- Account metadata and tokens are stored separately.
+- Sensitive tokens use the OS keychain by default.
+- Plaintext storage must be selected explicitly.
+
+### Runtime layer
+
+- On activation, the extension reads settings and checks the storage mode.
+- It can verify keychain availability and show a warning.
+- The dashboard rerenders from the currently stored accounts.
+
+### Message flow
+
+- The dashboard requests account add, switch, delete, reorder, and theme/locale changes through webview messages.
+- The extension receives those requests, updates storage, and shows the updated state again.
+
+## Main behavior
+
+### Add account
+
+1. Prepare an OAuth session.
+2. Receive the login result with `runPreparedOAuthLoginSession()`.
+3. Store the token and metadata.
+4. Open the dashboard again.
+
+### JSON import/export
+
+- Import: read account tokens from a JSON file and store them.
+- Export: write the currently stored accounts to a JSON file.
+
+### Refresh quota
+
+- Works for a single account or all accounts.
+- The refresh result is reflected back into the dashboard card HTML.
+
+## Settings
+
+Main settings exposed in `package.json`:
+
+- `codexMultiLogin.dashboardTheme`
+- `codexMultiLogin.dashboardLocale`
+- `codexMultiLogin.storageMode`
+
+## Implementation notes
+
+- Hide local file and keychain dependent features in web host mode.
+- Storage mode changes should update user warnings and saved settings together.
+- The dashboard message handler depends heavily on command strings.
+- Keep command names aligned with the actual registered commands.
+
+## Important facts
+
+- The project is a TypeScript-based VS Code extension.
+- It uses the `out/` artifacts for distribution.
+- It has a `browser` entry point for web compatibility.
+- Extension state uses both `globalState` and global storage.
+
+## Future work
+
+- Make the account store and dashboard message structure easier to maintain.
+- Keep the feature differences between web host mode and desktop mode documented in code and docs together.
+- Update related docs when the JSON format or storage rules change.
+
+<a name="korean"></a>
+# Codex Multi Login - 개발자 가이드
 
 이 문서는 `Codex Multi Login` 확장의 구조와 동작을 개발자 기준으로 설명합니다.
 
@@ -97,4 +197,3 @@
 - 계정 저장소와 대시보드 메시지 구조를 유지보수하기 쉽게 정리한다.
 - 웹 호스트 모드와 데스크톱 모드의 기능 차이를 문서와 코드에서 같이 관리한다.
 - JSON 형식과 storage 규칙이 바뀌면 관련 문서를 함께 갱신한다.
-
