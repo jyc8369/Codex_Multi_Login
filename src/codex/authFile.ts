@@ -69,10 +69,13 @@ export async function writeRawAuthFile(raw: string): Promise<void> {
   await fs.writeFile(getAuthJsonPath(), raw, "utf8");
 }
 
+<<<<<<< HEAD
 export async function deleteRawAuthFile(): Promise<void> {
   await fs.rm(getAuthJsonPath(), { force: true });
 }
 
+=======
+>>>>>>> origin/main
 export async function writePerAccountRawAuthFile(email: string, raw: string): Promise<void> {
   await fs.mkdir(getCodexHome(), { recursive: true });
   await fs.writeFile(getPerAccountAuthJsonPath(email), raw, "utf8");

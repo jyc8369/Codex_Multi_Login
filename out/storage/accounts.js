@@ -107,7 +107,11 @@ class AccountsStore {
         await (0, authFile_1.writePerAccountRawAuthFile)(record.email, rawAuth);
         if (markActive) {
             await (0, authFile_1.writeRawAuthFile)(rawAuth);
+<<<<<<< HEAD
             this.activeAccountIdFromAuthFile = tokens.accountId ?? record.accountId;
+=======
+            this.activeAccountIdFromAuthFile = tokens.accountId;
+>>>>>>> origin/main
             this.activeEmailFromAuthFile = record.email;
             this.log("info", `addTokens active email=${record.email} accountId=${tokens.accountId ?? "unknown"}`);
         }
@@ -165,13 +169,21 @@ class AccountsStore {
             this.log("warn", `switchAccount skipped id=${accountId} reason=missing_record`);
             return undefined;
         }
+<<<<<<< HEAD
         const raw = await this.getRawAuthForAccount(record);
+=======
+        const raw = await (0, authFile_1.readPerAccountRawAuthFile)(record.email);
+>>>>>>> origin/main
         if (!raw) {
             this.log("warn", `switchAccount skipped id=${accountId} reason=missing_raw_auth_file`);
             return undefined;
         }
         await (0, authFile_1.writeRawAuthFile)(raw);
+<<<<<<< HEAD
         this.activeAccountIdFromAuthFile = record.accountId ?? record.tokens?.accountId;
+=======
+        this.activeAccountIdFromAuthFile = record.accountId ?? record.tokens.accountId;
+>>>>>>> origin/main
         this.activeEmailFromAuthFile = record.email;
         this.log("info", `switchAccount wrote auth.json email=${record.email} accountId=${record.accountId ?? "unknown"}`);
         await this.files.writeIndex(index.map((item) => this.stripTokens({
@@ -197,14 +209,23 @@ class AccountsStore {
         await fs.rm((0, authFile_1.getPerAccountAuthJsonPath)(record.email), { force: true });
         if (record.isActive) {
             const nextActive = remaining.find((item) => item.id === nextCurrentAccountId);
+<<<<<<< HEAD
             if (nextActive) {
                 const raw = await this.getRawAuthForAccount(nextActive);
+=======
+            if (nextActive?.tokens) {
+                const raw = await (0, authFile_1.readPerAccountRawAuthFile)(nextActive.email);
+>>>>>>> origin/main
                 if (!raw) {
                     this.log("warn", `deleteAccount skipped auth.json rotation email=${nextActive.email} reason=missing_raw_auth_file`);
                     return this.rehydrateRecord(record);
                 }
                 await (0, authFile_1.writeRawAuthFile)(raw);
+<<<<<<< HEAD
                 this.activeAccountIdFromAuthFile = nextActive.accountId ?? nextActive.tokens?.accountId;
+=======
+                this.activeAccountIdFromAuthFile = nextActive.tokens.accountId;
+>>>>>>> origin/main
                 this.activeEmailFromAuthFile = nextActive.email;
                 this.log("info", `deleteAccount rotated auth.json email=${nextActive.email} accountId=${nextActive.accountId ?? "unknown"}`);
             }
@@ -273,7 +294,11 @@ class AccountsStore {
             if (record.isActive) {
                 this.log("info", `refreshAccount writeAuthJson id=${record.id}`);
                 await (0, authFile_1.writeRawAuthFile)(rawAuth);
+<<<<<<< HEAD
                 this.activeAccountIdFromAuthFile = tokens.accountId ?? record.accountId;
+=======
+                this.activeAccountIdFromAuthFile = tokens.accountId;
+>>>>>>> origin/main
                 this.activeEmailFromAuthFile = record.email;
             }
             this.log("info", `refreshAccount done id=${record.id} email=${record.email}`);
