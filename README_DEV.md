@@ -38,6 +38,8 @@ This document explains the structure and behavior of the `Codex Multi Login` ext
 ### Storage layer
 
 - Account metadata and tokens are stored separately.
+- Each account also has a raw Codex auth snapshot in `CODEX_HOME`/`~/.codex` named `auth.json_<safeEmail>.json`; path-unsafe email characters are replaced before the file name is built.
+- Account switching copies that raw snapshot to the active `auth.json` so unknown Codex auth fields are preserved.
 - Sensitive tokens use the OS keychain by default.
 - Plaintext storage must be selected explicitly.
 
@@ -58,7 +60,7 @@ This document explains the structure and behavior of the `Codex Multi Login` ext
 
 1. Prepare an OAuth session.
 2. Receive the login result with `runPreparedOAuthLoginSession()`.
-3. Store the token and metadata.
+3. Store the token, metadata, and generated raw `auth.json_<safeEmail>.json` snapshot.
 4. Open the dashboard again.
 
 ### JSON import/export
