@@ -68,6 +68,7 @@ export interface CodexAccountRecord {
   email: string;
   accountId?: string;
   storageKey?: string;
+  authFileName?: string;
   credentialsMissing?: boolean;
   planType?: string;
   isActive: boolean;
