@@ -3,10 +3,7 @@ import * as path from "path";
 import * as vscode from "vscode";
 import {
   buildAuthFilePayload,
-<<<<<<< HEAD
   deleteRawAuthFile,
-=======
->>>>>>> origin/main
   getPerAccountAuthJsonPath,
   readAuthFile,
   readPerAccountRawAuthFile,
@@ -115,11 +112,7 @@ export class AccountsStore {
     await writePerAccountRawAuthFile(record.email, rawAuth);
     if (markActive) {
       await writeRawAuthFile(rawAuth);
-<<<<<<< HEAD
       this.activeAccountIdFromAuthFile = tokens.accountId ?? record.accountId;
-=======
-      this.activeAccountIdFromAuthFile = tokens.accountId;
->>>>>>> origin/main
       this.activeEmailFromAuthFile = record.email;
       this.log("info", `addTokens active email=${record.email} accountId=${tokens.accountId ?? "unknown"}`);
     }
@@ -184,21 +177,13 @@ export class AccountsStore {
       this.log("warn", `switchAccount skipped id=${accountId} reason=missing_record`);
       return undefined;
     }
-<<<<<<< HEAD
     const raw = await this.getRawAuthForAccount(record);
-=======
-    const raw = await readPerAccountRawAuthFile(record.email);
->>>>>>> origin/main
     if (!raw) {
       this.log("warn", `switchAccount skipped id=${accountId} reason=missing_raw_auth_file`);
       return undefined;
     }
     await writeRawAuthFile(raw);
-<<<<<<< HEAD
     this.activeAccountIdFromAuthFile = record.accountId ?? record.tokens?.accountId;
-=======
-    this.activeAccountIdFromAuthFile = record.accountId ?? record.tokens.accountId;
->>>>>>> origin/main
     this.activeEmailFromAuthFile = record.email;
     this.log("info", `switchAccount wrote auth.json email=${record.email} accountId=${record.accountId ?? "unknown"}`);
     await this.files.writeIndex(
@@ -238,23 +223,14 @@ export class AccountsStore {
 
     if (record.isActive) {
       const nextActive = remaining.find((item) => item.id === nextCurrentAccountId);
-<<<<<<< HEAD
       if (nextActive) {
         const raw = await this.getRawAuthForAccount(nextActive);
-=======
-      if (nextActive?.tokens) {
-        const raw = await readPerAccountRawAuthFile(nextActive.email);
->>>>>>> origin/main
         if (!raw) {
           this.log("warn", `deleteAccount skipped auth.json rotation email=${nextActive.email} reason=missing_raw_auth_file`);
           return this.rehydrateRecord(record);
         }
         await writeRawAuthFile(raw);
-<<<<<<< HEAD
         this.activeAccountIdFromAuthFile = nextActive.accountId ?? nextActive.tokens?.accountId;
-=======
-        this.activeAccountIdFromAuthFile = nextActive.tokens.accountId;
->>>>>>> origin/main
         this.activeEmailFromAuthFile = nextActive.email;
         this.log("info", `deleteAccount rotated auth.json email=${nextActive.email} accountId=${nextActive.accountId ?? "unknown"}`);
       } else {
@@ -330,11 +306,7 @@ export class AccountsStore {
       if (record.isActive) {
         this.log("info", `refreshAccount writeAuthJson id=${record.id}`);
         await writeRawAuthFile(rawAuth);
-<<<<<<< HEAD
         this.activeAccountIdFromAuthFile = tokens.accountId ?? record.accountId;
-=======
-        this.activeAccountIdFromAuthFile = tokens.accountId;
->>>>>>> origin/main
         this.activeEmailFromAuthFile = record.email;
       }
       this.log("info", `refreshAccount done id=${record.id} email=${record.email}`);
