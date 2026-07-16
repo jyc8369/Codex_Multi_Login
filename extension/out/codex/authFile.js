@@ -35,7 +35,14 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getCodexHome = getCodexHome;
 exports.getAuthJsonPath = getAuthJsonPath;
+exports.sanitizeAuthFileEmail = sanitizeAuthFileEmail;
+exports.getPerAccountAuthJsonPath = getPerAccountAuthJsonPath;
+exports.readRawAuthFile = readRawAuthFile;
 exports.readAuthFile = readAuthFile;
+exports.buildAuthFilePayload = buildAuthFilePayload;
+exports.writeRawAuthFile = writeRawAuthFile;
+exports.writePerAccountRawAuthFile = writePerAccountRawAuthFile;
+exports.readPerAccountRawAuthFile = readPerAccountRawAuthFile;
 exports.writeAuthFile = writeAuthFile;
 const fs = __importStar(require("fs/promises"));
 const os = __importStar(require("os"));
@@ -47,18 +54,32 @@ function getCodexHome() {
 function getAuthJsonPath() {
     return path.join(getCodexHome(), "auth.json");
 }
-async function readAuthFile() {
+function sanitizeAuthFileEmail(email) {
+    const sanitized = email.trim().replace(/[\/\\:\s<>"|?*]+/g, "_").replace(/^\.+|\.+$/g, "");
+    return sanitized || "unknown";
+}
+function getPerAccountAuthJsonPath(email) {
+    return path.join(getCodexHome(), `auth.json_${sanitizeAuthFileEmail(email)}.json`);
+}
+async function readRawAuthFile() {
     try {
-        const raw = await fs.readFile(getAuthJsonPath(), "utf8");
-        return JSON.parse(raw);
+        return await fs.readFile(getAuthJsonPath(), "utf8");
     }
     catch {
         return undefined;
     }
 }
-async function writeAuthFile(tokens, email) {
-    await fs.mkdir(getCodexHome(), { recursive: true });
-    const payload = {
+async function readAuthFile() {
+    try {
+        const raw = await readRawAuthFile();
+        return raw ? JSON.parse(raw) : undefined;
+    }
+    catch {
+        return undefined;
+    }
+}
+function buildAuthFilePayload(tokens, email) {
+    return {
         OPENAI_API_KEY: null,
         email,
         tokens: {
@@ -69,6 +90,25 @@ async function writeAuthFile(tokens, email) {
         },
         last_refresh: new Date().toISOString()
     };
-    await fs.writeFile(getAuthJsonPath(), JSON.stringify(payload, null, 2), "utf8");
+}
+async function writeRawAuthFile(raw) {
+    await fs.mkdir(getCodexHome(), { recursive: true });
+    await fs.writeFile(getAuthJsonPath(), raw, "utf8");
+}
+async function writePerAccountRawAuthFile(email, raw) {
+    await fs.mkdir(getCodexHome(), { recursive: true });
+    await fs.writeFile(getPerAccountAuthJsonPath(email), raw, "utf8");
+}
+async function readPerAccountRawAuthFile(email) {
+    try {
+        return await fs.readFile(getPerAccountAuthJsonPath(email), "utf8");
+    }
+    catch {
+        return undefined;
+    }
+}
+async function writeAuthFile(tokens, email) {
+    const payload = buildAuthFilePayload(tokens, email);
+    await writeRawAuthFile(JSON.stringify(payload, null, 2));
 }
 //# sourceMappingURL=authFile.js.map

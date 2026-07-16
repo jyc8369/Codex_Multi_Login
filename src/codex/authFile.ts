@@ -24,18 +24,34 @@ export function getAuthJsonPath(): string {
   return path.join(getCodexHome(), "auth.json");
 }
 
-export async function readAuthFile(): Promise<CodexAuthFile | undefined> {
+export function sanitizeAuthFileEmail(email: string): string {
+  const sanitized = email.trim().replace(/[\/\\:\s<>"|?*]+/g, "_").replace(/^\.+|\.+$/g, "");
+  return sanitized || "unknown";
+}
+
+export function getPerAccountAuthJsonPath(email: string): string {
+  return path.join(getCodexHome(), `auth.json_${sanitizeAuthFileEmail(email)}.json`);
+}
+
+export async function readRawAuthFile(): Promise<string | undefined> {
   try {
-    const raw = await fs.readFile(getAuthJsonPath(), "utf8");
-    return JSON.parse(raw) as CodexAuthFile;
+    return await fs.readFile(getAuthJsonPath(), "utf8");
   } catch {
     return undefined;
   }
 }
 
-export async function writeAuthFile(tokens: CodexTokens, email?: string): Promise<void> {
-  await fs.mkdir(getCodexHome(), { recursive: true });
-  const payload: CodexAuthFile = {
+export async function readAuthFile(): Promise<CodexAuthFile | undefined> {
+  try {
+    const raw = await readRawAuthFile();
+    return raw ? (JSON.parse(raw) as CodexAuthFile) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function buildAuthFilePayload(tokens: CodexTokens, email?: string): CodexAuthFile {
+  return {
     OPENAI_API_KEY: null,
     email,
     tokens: {
@@ -46,5 +62,27 @@ export async function writeAuthFile(tokens: CodexTokens, email?: string): Promis
     },
     last_refresh: new Date().toISOString()
   };
-  await fs.writeFile(getAuthJsonPath(), JSON.stringify(payload, null, 2), "utf8");
+}
+
+export async function writeRawAuthFile(raw: string): Promise<void> {
+  await fs.mkdir(getCodexHome(), { recursive: true });
+  await fs.writeFile(getAuthJsonPath(), raw, "utf8");
+}
+
+export async function writePerAccountRawAuthFile(email: string, raw: string): Promise<void> {
+  await fs.mkdir(getCodexHome(), { recursive: true });
+  await fs.writeFile(getPerAccountAuthJsonPath(email), raw, "utf8");
+}
+
+export async function readPerAccountRawAuthFile(email: string): Promise<string | undefined> {
+  try {
+    return await fs.readFile(getPerAccountAuthJsonPath(email), "utf8");
+  } catch {
+    return undefined;
+  }
+}
+
+export async function writeAuthFile(tokens: CodexTokens, email?: string): Promise<void> {
+  const payload = buildAuthFilePayload(tokens, email);
+  await writeRawAuthFile(JSON.stringify(payload, null, 2));
 }
