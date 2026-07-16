@@ -16,6 +16,7 @@ This extension lets you add accounts through OAuth, switch the active account, r
 ## Storage
 
 - Active Codex auth file: `~/.codex/auth.json`
+- Per-account raw Codex auth snapshots: `~/.codex/auth.json_<safeEmail>.json`; switching accounts copies the selected raw snapshot back to the active `auth.json` instead of reconstructing it from tokens.
 - VS Code global storage:
   - `account.json`: canonical non-sensitive account metadata only
   - `tokens.json`: saved account tokens in plaintext mode only, keyed by `storageKey`
@@ -44,7 +45,7 @@ See `JSON_FORMAT.md` for the supported format.
 ## Notes
 
 - This is a lightweight personal-use build.
-- Switching accounts overwrites the active Codex auth file.
+- Switching accounts overwrites the active Codex auth file by copying the matching per-account raw auth snapshot.
 - Deleting an account removes it from the metadata files and token store.
 - The extension also exposes a browser entry point for VS Code Web.
 - Web host mode shows a read-only dashboard backed by VS Code web storage.

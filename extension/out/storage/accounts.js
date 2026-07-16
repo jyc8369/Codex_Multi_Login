@@ -35,6 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AccountsStore = void 0;
 const fs = __importStar(require("fs/promises"));
+const path = __importStar(require("path"));
 const authFile_1 = require("../codex/authFile");
 const oauth_1 = require("../auth/oauth");
 const quota_1 = require("../services/quota");
@@ -91,6 +92,7 @@ class AccountsStore {
             email,
             accountId: claims.accountId ?? tokens.accountId,
             storageKey,
+            authFileName: path.basename((0, authFile_1.getPerAccountAuthJsonPath)(email)),
             planType: claims.planType,
             isActive: markActive,
             tokens,
@@ -100,9 +102,11 @@ class AccountsStore {
         const accounts = index.filter((item) => item.id !== id);
         accounts.push(this.stripTokens(record));
         await this.files.writeIndex(accounts, markActive ? id : undefined);
+        const rawAuth = JSON.stringify((0, authFile_1.buildAuthFilePayload)(tokens, record.email), null, 2);
         await this.writeTokens(record, tokens, record.email);
+        await (0, authFile_1.writePerAccountRawAuthFile)(record.email, rawAuth);
         if (markActive) {
-            await (0, authFile_1.writeAuthFile)(tokens, record.email);
+            await (0, authFile_1.writeRawAuthFile)(rawAuth);
             this.activeAccountIdFromAuthFile = tokens.accountId;
             this.activeEmailFromAuthFile = record.email;
             this.log("info", `addTokens active email=${record.email} accountId=${tokens.accountId ?? "unknown"}`);
@@ -111,17 +115,23 @@ class AccountsStore {
         return record;
     }
     async importCurrentAuth() {
-        const auth = await (0, authFile_1.readAuthFile)();
-        if (!auth) {
+        const [auth, raw] = await Promise.all([(0, authFile_1.readAuthFile)(), (0, authFile_1.readRawAuthFile)()]);
+        if (!auth || !raw) {
             this.log("warn", "importCurrentAuth skipped reason=no_auth_file");
             return undefined;
         }
-        return this.addTokens({
+        const imported = await this.addTokens({
             idToken: auth.tokens.id_token,
             accessToken: auth.tokens.access_token,
             refreshToken: auth.tokens.refresh_token,
             accountId: auth.tokens.account_id
         }, true);
+        await (0, authFile_1.writePerAccountRawAuthFile)(imported.email, raw);
+        await (0, authFile_1.writeRawAuthFile)(raw);
+        return {
+            ...imported,
+            authFileName: path.basename((0, authFile_1.getPerAccountAuthJsonPath)(imported.email))
+        };
     }
     async importFromJsonFile(filePath) {
         const raw = await fs.readFile(filePath, "utf8");
@@ -155,7 +165,14 @@ class AccountsStore {
             this.log("warn", `switchAccount skipped id=${accountId} reason=missing_record`);
             return undefined;
         }
-        await (0, authFile_1.writeAuthFile)(record.tokens, record.email);
+        const raw = await (0, authFile_1.readPerAccountRawAuthFile)(record.email);
+        if (!raw) {
+            this.log("warn", `switchAccount skipped id=${accountId} reason=missing_raw_auth_file`);
+            return undefined;
+        }
+        await (0, authFile_1.writeRawAuthFile)(raw);
+        this.activeAccountIdFromAuthFile = record.accountId ?? record.tokens.accountId;
+        this.activeEmailFromAuthFile = record.email;
         this.log("info", `switchAccount wrote auth.json email=${record.email} accountId=${record.accountId ?? "unknown"}`);
         await this.files.writeIndex(index.map((item) => this.stripTokens({
             ...item,
@@ -177,10 +194,16 @@ class AccountsStore {
             isActive: item.id === nextCurrentAccountId
         })), nextCurrentAccountId);
         await this.deleteTokens(record);
+        await fs.rm((0, authFile_1.getPerAccountAuthJsonPath)(record.email), { force: true });
         if (record.isActive) {
             const nextActive = remaining.find((item) => item.id === nextCurrentAccountId);
             if (nextActive?.tokens) {
-                await (0, authFile_1.writeAuthFile)(nextActive.tokens, nextActive.email);
+                const raw = await (0, authFile_1.readPerAccountRawAuthFile)(nextActive.email);
+                if (!raw) {
+                    this.log("warn", `deleteAccount skipped auth.json rotation email=${nextActive.email} reason=missing_raw_auth_file`);
+                    return this.rehydrateRecord(record);
+                }
+                await (0, authFile_1.writeRawAuthFile)(raw);
                 this.activeAccountIdFromAuthFile = nextActive.tokens.accountId;
                 this.activeEmailFromAuthFile = nextActive.email;
                 this.log("info", `deleteAccount rotated auth.json email=${nextActive.email} accountId=${nextActive.accountId ?? "unknown"}`);
@@ -231,14 +254,18 @@ class AccountsStore {
                 lastQuotaAt: Date.now(),
                 updatedAt: Date.now()
             };
+            const rawAuth = JSON.stringify((0, authFile_1.buildAuthFilePayload)(tokens, record.email), null, 2);
             this.log("info", `refreshAccount writeTokens id=${record.id}`);
             await this.writeTokens(record, tokens, record.email);
+            await (0, authFile_1.writePerAccountRawAuthFile)(record.email, rawAuth);
             const replaced = index.map((item) => this.stripTokens(item.id === accountId ? updated : item));
             this.log("info", `refreshAccount writeIndex id=${record.id}`);
             await this.files.writeIndex(replaced, this.findCurrentAccountId(replaced));
             if (record.isActive) {
                 this.log("info", `refreshAccount writeAuthJson id=${record.id}`);
-                await (0, authFile_1.writeAuthFile)(tokens, record.email);
+                await (0, authFile_1.writeRawAuthFile)(rawAuth);
+                this.activeAccountIdFromAuthFile = tokens.accountId;
+                this.activeEmailFromAuthFile = record.email;
             }
             this.log("info", `refreshAccount done id=${record.id} email=${record.email}`);
             return updated;
@@ -417,7 +444,8 @@ class AccountsStore {
         const { tokens: _tokens, credentialsMissing: _credentialsMissing, ...rest } = account;
         return {
             ...rest,
-            storageKey: rest.storageKey ?? this.secretKey(rest.id)
+            storageKey: rest.storageKey ?? this.secretKey(rest.id),
+            authFileName: rest.authFileName ?? path.basename((0, authFile_1.getPerAccountAuthJsonPath)(rest.email))
         };
     }
     rehydrateRecord(stored) {
