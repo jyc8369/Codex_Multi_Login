@@ -41,6 +41,7 @@ exports.readRawAuthFile = readRawAuthFile;
 exports.readAuthFile = readAuthFile;
 exports.buildAuthFilePayload = buildAuthFilePayload;
 exports.writeRawAuthFile = writeRawAuthFile;
+exports.deleteRawAuthFile = deleteRawAuthFile;
 exports.writePerAccountRawAuthFile = writePerAccountRawAuthFile;
 exports.readPerAccountRawAuthFile = readPerAccountRawAuthFile;
 exports.writeAuthFile = writeAuthFile;
@@ -94,6 +95,9 @@ function buildAuthFilePayload(tokens, email) {
 async function writeRawAuthFile(raw) {
     await fs.mkdir(getCodexHome(), { recursive: true });
     await fs.writeFile(getAuthJsonPath(), raw, "utf8");
+}
+async function deleteRawAuthFile() {
+    await fs.rm(getAuthJsonPath(), { force: true });
 }
 async function writePerAccountRawAuthFile(email, raw) {
     await fs.mkdir(getCodexHome(), { recursive: true });

@@ -3,6 +3,7 @@ import * as path from "path";
 import * as vscode from "vscode";
 import {
   buildAuthFilePayload,
+  deleteRawAuthFile,
   getPerAccountAuthJsonPath,
   readAuthFile,
   readPerAccountRawAuthFile,
@@ -111,7 +112,7 @@ export class AccountsStore {
     await writePerAccountRawAuthFile(record.email, rawAuth);
     if (markActive) {
       await writeRawAuthFile(rawAuth);
-      this.activeAccountIdFromAuthFile = tokens.accountId;
+      this.activeAccountIdFromAuthFile = tokens.accountId ?? record.accountId;
       this.activeEmailFromAuthFile = record.email;
       this.log("info", `addTokens active email=${record.email} accountId=${tokens.accountId ?? "unknown"}`);
     }
@@ -172,17 +173,17 @@ export class AccountsStore {
   async switchAccount(accountId: string): Promise<CodexAccountRecord | undefined> {
     const index = await this.readIndex();
     const record = index.find((item) => item.id === accountId);
-    if (!record?.tokens) {
+    if (!record) {
       this.log("warn", `switchAccount skipped id=${accountId} reason=missing_record`);
       return undefined;
     }
-    const raw = await readPerAccountRawAuthFile(record.email);
+    const raw = await this.getRawAuthForAccount(record);
     if (!raw) {
       this.log("warn", `switchAccount skipped id=${accountId} reason=missing_raw_auth_file`);
       return undefined;
     }
     await writeRawAuthFile(raw);
-    this.activeAccountIdFromAuthFile = record.accountId ?? record.tokens.accountId;
+    this.activeAccountIdFromAuthFile = record.accountId ?? record.tokens?.accountId;
     this.activeEmailFromAuthFile = record.email;
     this.log("info", `switchAccount wrote auth.json email=${record.email} accountId=${record.accountId ?? "unknown"}`);
     await this.files.writeIndex(
@@ -222,16 +223,20 @@ export class AccountsStore {
 
     if (record.isActive) {
       const nextActive = remaining.find((item) => item.id === nextCurrentAccountId);
-      if (nextActive?.tokens) {
-        const raw = await readPerAccountRawAuthFile(nextActive.email);
+      if (nextActive) {
+        const raw = await this.getRawAuthForAccount(nextActive);
         if (!raw) {
           this.log("warn", `deleteAccount skipped auth.json rotation email=${nextActive.email} reason=missing_raw_auth_file`);
           return this.rehydrateRecord(record);
         }
         await writeRawAuthFile(raw);
-        this.activeAccountIdFromAuthFile = nextActive.tokens.accountId;
+        this.activeAccountIdFromAuthFile = nextActive.accountId ?? nextActive.tokens?.accountId;
         this.activeEmailFromAuthFile = nextActive.email;
         this.log("info", `deleteAccount rotated auth.json email=${nextActive.email} accountId=${nextActive.accountId ?? "unknown"}`);
+      } else {
+        await deleteRawAuthFile();
+        this.activeAccountIdFromAuthFile = undefined;
+        this.activeEmailFromAuthFile = undefined;
       }
     }
 
@@ -273,7 +278,11 @@ export class AccountsStore {
       let tokens = record.tokens;
       if (tokens.refreshToken && isTokenExpired(tokens.accessToken)) {
         this.log("info", `refreshAccount refreshToken id=${record.id}`);
-        tokens = await refreshTokens(tokens.refreshToken);
+        const refreshedTokens = await refreshTokens(tokens.refreshToken);
+        tokens = {
+          ...refreshedTokens,
+          accountId: refreshedTokens.accountId ?? tokens.accountId ?? record.accountId
+        };
       }
 
       this.log("info", `refreshAccount fetchQuota id=${record.id}`);
@@ -297,7 +306,7 @@ export class AccountsStore {
       if (record.isActive) {
         this.log("info", `refreshAccount writeAuthJson id=${record.id}`);
         await writeRawAuthFile(rawAuth);
-        this.activeAccountIdFromAuthFile = tokens.accountId;
+        this.activeAccountIdFromAuthFile = tokens.accountId ?? record.accountId;
         this.activeEmailFromAuthFile = record.email;
       }
       this.log("info", `refreshAccount done id=${record.id} email=${record.email}`);
@@ -321,6 +330,21 @@ export class AccountsStore {
     }
     this.log("info", `refreshAll done count=${updated.length}`);
     return updated;
+  }
+
+  private async getRawAuthForAccount(account: CodexAccountRecord): Promise<string | undefined> {
+    const raw = await readPerAccountRawAuthFile(account.email);
+    if (raw) {
+      return raw;
+    }
+    if (!account.tokens) {
+      return undefined;
+    }
+
+    const fallbackRaw = JSON.stringify(buildAuthFilePayload(account.tokens, account.email), null, 2);
+    await writePerAccountRawAuthFile(account.email, fallbackRaw);
+    this.log("warn", `getRawAuthForAccount rebuilt missing raw auth file id=${account.id} email=${account.email}`);
+    return fallbackRaw;
   }
 
   private async readIndex(): Promise<CodexAccountRecord[]> {
