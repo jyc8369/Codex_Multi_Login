@@ -219,6 +219,30 @@ class AccountsStore {
             ...item,
             isActive: item.id === nextCurrentAccountId
         })), nextCurrentAccountId);
+<<<<<<< HEAD
+=======
+        await this.deleteTokens(record);
+        await fs.rm((0, authFile_1.getPerAccountAuthJsonPath)(record.email), { force: true });
+        if (record.isActive) {
+            const nextActive = remaining.find((item) => item.id === nextCurrentAccountId);
+            if (nextActive) {
+                const raw = await this.getRawAuthForAccount(nextActive);
+                if (!raw) {
+                    this.log("warn", `deleteAccount skipped auth.json rotation email=${nextActive.email} reason=missing_raw_auth_file`);
+                    return this.rehydrateRecord(record);
+                }
+                await (0, authFile_1.writeRawAuthFile)(raw);
+                this.activeAccountIdFromAuthFile = nextActive.accountId ?? nextActive.tokens?.accountId;
+                this.activeEmailFromAuthFile = nextActive.email;
+                this.log("info", `deleteAccount rotated auth.json email=${nextActive.email} accountId=${nextActive.accountId ?? "unknown"}`);
+            }
+            else {
+                await (0, authFile_1.deleteRawAuthFile)();
+                this.activeAccountIdFromAuthFile = undefined;
+                this.activeEmailFromAuthFile = undefined;
+            }
+        }
+>>>>>>> origin/main
         return this.rehydrateRecord(record);
     }
     async moveAccount(accountId, targetAccountId, placement) {
