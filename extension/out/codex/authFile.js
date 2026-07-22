@@ -36,7 +36,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getCodexHome = getCodexHome;
 exports.getAuthJsonPath = getAuthJsonPath;
 exports.readAuthFile = readAuthFile;
-exports.writeAuthFile = writeAuthFile;
+exports.buildAuthFileFromTokens = buildAuthFileFromTokens;
+exports.writeRawAuthFile = writeRawAuthFile;
+exports.writeAuthFileFromTokens = writeAuthFileFromTokens;
 const fs = __importStar(require("fs/promises"));
 const os = __importStar(require("os"));
 const path = __importStar(require("path"));
@@ -56,9 +58,8 @@ async function readAuthFile() {
         return undefined;
     }
 }
-async function writeAuthFile(tokens, email) {
-    await fs.mkdir(getCodexHome(), { recursive: true });
-    const payload = {
+function buildAuthFileFromTokens(tokens, email) {
+    return {
         OPENAI_API_KEY: null,
         email,
         tokens: {
@@ -69,6 +70,12 @@ async function writeAuthFile(tokens, email) {
         },
         last_refresh: new Date().toISOString()
     };
-    await fs.writeFile(getAuthJsonPath(), JSON.stringify(payload, null, 2), "utf8");
+}
+async function writeRawAuthFile(authJson) {
+    await fs.mkdir(getCodexHome(), { recursive: true });
+    await fs.writeFile(getAuthJsonPath(), JSON.stringify(authJson, null, 2), "utf8");
+}
+async function writeAuthFileFromTokens(tokens, email) {
+    await writeRawAuthFile(buildAuthFileFromTokens(tokens, email));
 }
 //# sourceMappingURL=authFile.js.map

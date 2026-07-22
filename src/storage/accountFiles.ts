@@ -1,6 +1,7 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import * as vscode from "vscode";
+import type { CodexAuthFile } from "../codex/authFile";
 import { CodexTokens, StorageMode, StoredAccountRecord } from "../types";
 
 export interface AccountIndex {
@@ -10,6 +11,7 @@ export interface AccountIndex {
 
 interface StoredTokenRecord {
   tokens: CodexTokens;
+  authJson?: CodexAuthFile;
   email?: string;
 }
 

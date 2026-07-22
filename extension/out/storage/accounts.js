@@ -79,7 +79,7 @@ class AccountsStore {
         this.log("warn", `purgeMissingCredentials removed=${missing.length}`);
         return missing.length;
     }
-    async addTokens(tokens, markActive = true) {
+    async addTokens(tokens, markActive = true, authJson) {
         const claims = (0, jwt_1.extractClaims)(tokens.idToken, tokens.accessToken);
         const index = await this.readIndex();
         const email = claims.email ?? tokens.accountId ?? "unknown";
@@ -94,15 +94,16 @@ class AccountsStore {
             planType: claims.planType,
             isActive: markActive,
             tokens,
+            authJson: authJson ?? (0, authFile_1.buildAuthFileFromTokens)(tokens, email),
             createdAt: index.find((item) => item.id === id)?.createdAt ?? now,
             updatedAt: now
         };
         const accounts = index.filter((item) => item.id !== id);
         accounts.push(this.stripTokens(record));
         await this.files.writeIndex(accounts, markActive ? id : undefined);
-        await this.writeTokens(record, tokens, record.email);
+        await this.writeTokens(record, tokens, record.email, record.authJson);
         if (markActive) {
-            await (0, authFile_1.writeAuthFile)(tokens, record.email);
+            await (0, authFile_1.writeRawAuthFile)(record.authJson);
             this.activeAccountIdFromAuthFile = tokens.accountId;
             this.activeEmailFromAuthFile = record.email;
             this.log("info", `addTokens active email=${record.email} accountId=${tokens.accountId ?? "unknown"}`);
@@ -121,7 +122,7 @@ class AccountsStore {
             accessToken: auth.tokens.access_token,
             refreshToken: auth.tokens.refresh_token,
             accountId: auth.tokens.account_id
-        }, true);
+        }, true, auth);
     }
     async importFromJsonFile(filePath) {
         const raw = await fs.readFile(filePath, "utf8");
@@ -133,7 +134,7 @@ class AccountsStore {
             if (!shared?.tokens) {
                 continue;
             }
-            imported.push(await this.addTokens(shared.tokens, false));
+            imported.push(await this.addTokens(shared.tokens, false, shared.authJson));
         }
         return imported;
     }
@@ -144,6 +145,7 @@ class AccountsStore {
             .map((account) => ({
             email: account.email,
             id: account.id,
+            authJson: account.authJson,
             tokens: account.tokens
         }));
         await fs.writeFile(filePath, JSON.stringify(payload, null, 2), "utf8");
@@ -155,7 +157,9 @@ class AccountsStore {
             this.log("warn", `switchAccount skipped id=${accountId} reason=missing_record`);
             return undefined;
         }
-        await (0, authFile_1.writeAuthFile)(record.tokens, record.email);
+        await this.writeStoredAuthFile(record, "switchAccount");
+        this.activeAccountIdFromAuthFile = record.tokens.accountId;
+        this.activeEmailFromAuthFile = record.email;
         this.log("info", `switchAccount wrote auth.json email=${record.email} accountId=${record.accountId ?? "unknown"}`);
         await this.files.writeIndex(index.map((item) => this.stripTokens({
             ...item,
@@ -171,7 +175,7 @@ class AccountsStore {
             return undefined;
         }
         const remaining = index.filter((item) => item.id !== accountId);
-        const nextCurrentAccountId = record.id === accountId ? remaining.find((item) => item.id !== accountId)?.id : undefined;
+        const nextCurrentAccountId = record.isActive ? remaining[0]?.id : this.findCurrentAccountId(remaining);
         await this.files.writeIndex(remaining.map((item) => this.stripTokens({
             ...item,
             isActive: item.id === nextCurrentAccountId
@@ -180,7 +184,7 @@ class AccountsStore {
         if (record.isActive) {
             const nextActive = remaining.find((item) => item.id === nextCurrentAccountId);
             if (nextActive?.tokens) {
-                await (0, authFile_1.writeAuthFile)(nextActive.tokens, nextActive.email);
+                await this.writeStoredAuthFile(nextActive, "deleteAccount");
                 this.activeAccountIdFromAuthFile = nextActive.tokens.accountId;
                 this.activeEmailFromAuthFile = nextActive.email;
                 this.log("info", `deleteAccount rotated auth.json email=${nextActive.email} accountId=${nextActive.accountId ?? "unknown"}`);
@@ -224,21 +228,23 @@ class AccountsStore {
             }
             this.log("info", `refreshAccount fetchQuota id=${record.id}`);
             const quotaSummary = await (0, quota_1.refreshQuota)(tokens, logger);
+            const authJson = record.authJson ? this.withUpdatedTokens(record.authJson, tokens, record.email) : undefined;
             const updated = {
                 ...record,
                 tokens,
+                authJson,
                 quotaSummary,
                 lastQuotaAt: Date.now(),
                 updatedAt: Date.now()
             };
             this.log("info", `refreshAccount writeTokens id=${record.id}`);
-            await this.writeTokens(record, tokens, record.email);
+            await this.writeTokens(record, tokens, record.email, authJson);
             const replaced = index.map((item) => this.stripTokens(item.id === accountId ? updated : item));
             this.log("info", `refreshAccount writeIndex id=${record.id}`);
             await this.files.writeIndex(replaced, this.findCurrentAccountId(replaced));
             if (record.isActive) {
                 this.log("info", `refreshAccount writeAuthJson id=${record.id}`);
-                await (0, authFile_1.writeAuthFile)(tokens, record.email);
+                await this.writeStoredAuthFile({ ...record, tokens, authJson }, "refreshAccount");
             }
             this.log("info", `refreshAccount done id=${record.id} email=${record.email}`);
             return updated;
@@ -271,7 +277,7 @@ class AccountsStore {
             const hydrated = meta.accounts.map((account) => {
                 const key = this.storageKeyForAccount(account);
                 const stored = storedTokens[key] ?? storedTokens[account.id];
-                return this.hydrateRecord(account, stored?.tokens, stored?.email ?? account.email, activeAccountId, activeEmail);
+                return this.hydrateRecord(account, stored?.tokens, stored?.email ?? account.email, activeAccountId, activeEmail, stored?.authJson);
             });
             this.log("info", `readIndex accounts=${hydrated.length} activeAccountId=${activeAccountId ?? "none"} activeEmail=${activeEmail ?? "none"}`);
             return hydrated;
@@ -280,11 +286,11 @@ class AccountsStore {
             return [];
         }
     }
-    async writeTokens(account, tokens, email) {
+    async writeTokens(account, tokens, email, authJson) {
         const mode = this.getConfiguredStorageMode();
         const storageKey = this.storageKeyForAccount(account);
         if (mode === "keychain") {
-            const payload = JSON.stringify({ tokens, email });
+            const payload = JSON.stringify({ authJson, tokens, email });
             await this.context.secrets.store(storageKey, payload);
             const verify = await this.context.secrets.get(storageKey);
             this.log("info", `writeTokens keychain id=${account.id} email=${email ?? "none"} key=${storageKey} stored=${Boolean(verify)}`);
@@ -292,7 +298,7 @@ class AccountsStore {
             return;
         }
         const current = await this.files.readPlaintextTokens();
-        current[storageKey] = { tokens, email };
+        current[storageKey] = { authJson, tokens, email };
         await this.files.writePlaintextTokens(current);
         this.log("info", `writeTokens plaintext id=${account.id} email=${email ?? "none"} key=${storageKey}`);
         await this.context.secrets.delete(storageKey);
@@ -362,7 +368,7 @@ class AccountsStore {
             const record = stored[storageKey] ?? stored[account.id];
             if (!record?.tokens)
                 continue;
-            await this.writeTokens(account, record.tokens, record.email ?? account.email);
+            await this.writeTokens(account, record.tokens, record.email ?? account.email, record.authJson);
         }
         if (mode === "keychain") {
             await this.files.removePlaintextTokens();
@@ -404,17 +410,18 @@ class AccountsStore {
     storageKeyForAccount(account) {
         return account.storageKey ?? this.secretKey(account.id);
     }
-    hydrateRecord(stored, tokens, email, activeAccountId, activeEmail) {
+    hydrateRecord(stored, tokens, email, activeAccountId, activeEmail, authJson) {
         return {
             ...stored,
             email,
             tokens,
+            authJson,
             credentialsMissing: !tokens,
             isActive: this.matchesActiveIdentity({ email, accountId: stored.accountId }, activeAccountId, activeEmail)
         };
     }
     stripTokens(account) {
-        const { tokens: _tokens, credentialsMissing: _credentialsMissing, ...rest } = account;
+        const { tokens: _tokens, authJson: _authJson, credentialsMissing: _credentialsMissing, ...rest } = account;
         return {
             ...rest,
             storageKey: rest.storageKey ?? this.secretKey(rest.id)
@@ -442,11 +449,49 @@ class AccountsStore {
     log(level, message) {
         this.logger?.appendLine(`[${level}] [accounts] ${message}`);
     }
+    async writeStoredAuthFile(record, operation) {
+        if (record.authJson) {
+            await (0, authFile_1.writeRawAuthFile)(record.authJson);
+            return;
+        }
+        if (!record.tokens) {
+            throw new Error(`${operation} failed: missing tokens`);
+        }
+        this.log("warn", `${operation} legacy_tokens_only email=${record.email} accountId=${record.accountId ?? "unknown"}`);
+        await (0, authFile_1.writeAuthFileFromTokens)(record.tokens, record.email);
+    }
+    withUpdatedTokens(authJson, tokens, email) {
+        return {
+            ...authJson,
+            email: authJson.email ?? email,
+            tokens: {
+                ...authJson.tokens,
+                id_token: tokens.idToken,
+                access_token: tokens.accessToken,
+                refresh_token: tokens.refreshToken,
+                account_id: tokens.accountId
+            }
+        };
+    }
     normalizeSharedJson(value) {
         if (!value || typeof value !== "object") {
             return undefined;
         }
         const candidate = value;
+        if (candidate.authJson?.tokens?.id_token && candidate.authJson.tokens.access_token) {
+            const authTokens = candidate.authJson.tokens;
+            return {
+                email: candidate.email ?? candidate.authJson.email,
+                id: candidate.id,
+                authJson: candidate.authJson,
+                tokens: candidate.tokens ?? {
+                    idToken: authTokens.id_token,
+                    accessToken: authTokens.access_token,
+                    refreshToken: authTokens.refresh_token,
+                    accountId: authTokens.account_id
+                }
+            };
+        }
         if (candidate.tokens?.idToken && candidate.tokens?.accessToken) {
             return candidate;
         }

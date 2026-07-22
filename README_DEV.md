@@ -8,7 +8,7 @@ This document explains the structure and behavior of the `Codex Multi Login` ext
 ## Project goals
 
 - Manage multiple Codex accounts in one place.
-- Switch the active `auth.json` safely.
+- Store and switch the active `auth.json` as a whole file so unknown Codex fields are preserved.
 - Check saved tokens and quota status in the dashboard.
 - Provide the available feature set in VS Code Web as well.
 
@@ -37,7 +37,8 @@ This document explains the structure and behavior of the `Codex Multi Login` ext
 
 ### Storage layer
 
-- Account metadata and tokens are stored separately.
+- Account metadata and credentials are stored separately.
+- The main credential payload stores the original Codex `auth.json` as `authJson` when available, plus normalized tokens for quota checks and legacy compatibility.
 - Sensitive tokens use the OS keychain by default.
 - Plaintext storage must be selected explicitly.
 
@@ -63,8 +64,8 @@ This document explains the structure and behavior of the `Codex Multi Login` ext
 
 ### JSON import/export
 
-- Import: read account tokens from a JSON file and store them.
-- Export: write the currently stored accounts to a JSON file.
+- Import: read account credentials from a JSON file and store them. New-format records may include the original `authJson`; legacy token-only records still import.
+- Export: write the currently stored accounts to a JSON file, including `authJson` when available and normalized `tokens` for compatibility.
 
 ### Refresh quota
 

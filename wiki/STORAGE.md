@@ -16,7 +16,7 @@ If `CODEX_HOME` is set, the file becomes:
 ${CODEX_HOME}/auth.json
 ```
 
-The file is rewritten when you switch accounts.
+The file is rewritten when you switch accounts. The primary switching unit is the saved original `auth.json` for that account, not a reconstructed token-only file.
 
 ## 2. VS Code global storage
 
@@ -39,11 +39,14 @@ Files:
   - `storageKey` for the token backend entry
   - Non-sensitive account fields only
 - `tokens.json`
-  - Saved tokens keyed by `storageKey`
+  - Saved account credentials keyed by `storageKey`
+  - Stores the original `auth.json` as `authJson` when available
+  - Stores normalized `tokens` for quota checks and legacy compatibility
   - Used only in plaintext mode
 
 ## Notes
 
-- `Switch Account` overwrites `auth.json` with the selected account tokens.
+- `Switch Account` overwrites `auth.json` with the selected account's saved original `authJson`.
+- Legacy entries that only have `tokens` still switch by generating a minimal `auth.json`.
 - `Delete` removes the selected account from `account.json` and `tokens.json` or the keychain entry.
 - If a keychain entry disappears, the dashboard marks the account as `Credentials missing` and removes it from the saved list on refresh.

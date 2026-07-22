@@ -9,7 +9,7 @@ It helps you keep accounts in one place and switch between them more easily.
 ## What it does
 
 - Add a Codex account
-- Switch the active account
+- Switch the active account by restoring the saved original `auth.json`
 - Check quota again
 - Save account information
 - Open a simple dashboard
@@ -25,7 +25,7 @@ It helps you keep accounts in one place and switch between them more easily.
 ## Notes
 
 - Some features only work in the desktop version of VS Code.
-- The extension keeps account data in VS Code storage.
+- The extension keeps account data in VS Code storage and preserves unknown `auth.json` fields when the original file was saved.
 - More details are in the developer guide.
 
 <a name="korean"></a>

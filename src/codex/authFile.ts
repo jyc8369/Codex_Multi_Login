@@ -1,9 +1,10 @@
 import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
-import { CodexTokens } from "../types";
+import type { CodexTokens } from "../types";
 
 export interface CodexAuthFile {
+  [key: string]: unknown;
   OPENAI_API_KEY: string | null;
   email?: string;
   tokens: {
@@ -33,9 +34,8 @@ export async function readAuthFile(): Promise<CodexAuthFile | undefined> {
   }
 }
 
-export async function writeAuthFile(tokens: CodexTokens, email?: string): Promise<void> {
-  await fs.mkdir(getCodexHome(), { recursive: true });
-  const payload: CodexAuthFile = {
+export function buildAuthFileFromTokens(tokens: CodexTokens, email?: string): CodexAuthFile {
+  return {
     OPENAI_API_KEY: null,
     email,
     tokens: {
@@ -46,5 +46,13 @@ export async function writeAuthFile(tokens: CodexTokens, email?: string): Promis
     },
     last_refresh: new Date().toISOString()
   };
-  await fs.writeFile(getAuthJsonPath(), JSON.stringify(payload, null, 2), "utf8");
+}
+
+export async function writeRawAuthFile(authJson: CodexAuthFile): Promise<void> {
+  await fs.mkdir(getCodexHome(), { recursive: true });
+  await fs.writeFile(getAuthJsonPath(), JSON.stringify(authJson, null, 2), "utf8");
+}
+
+export async function writeAuthFileFromTokens(tokens: CodexTokens, email?: string): Promise<void> {
+  await writeRawAuthFile(buildAuthFileFromTokens(tokens, email));
 }

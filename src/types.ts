@@ -1,3 +1,5 @@
+import type { CodexAuthFile } from "./codex/authFile";
+
 export interface CodexTokens {
   idToken: string;
   accessToken: string;
@@ -72,16 +74,18 @@ export interface CodexAccountRecord {
   planType?: string;
   isActive: boolean;
   tokens?: CodexTokens;
+  authJson?: CodexAuthFile;
   quotaSummary?: CodexQuotaSummary;
   lastQuotaAt?: number;
   createdAt: number;
   updatedAt: number;
 }
 
-export type StoredAccountRecord = Omit<CodexAccountRecord, "tokens">;
+export type StoredAccountRecord = Omit<CodexAccountRecord, "tokens" | "authJson">;
 
 export interface SharedCodexAccountJson {
   email?: string;
   id?: string;
   tokens?: CodexTokens;
+  authJson?: CodexAuthFile;
 }
