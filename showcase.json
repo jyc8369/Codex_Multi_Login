@@ -5,8 +5,13 @@
   "featured": true,
   "order": 3,
   "category": "Utility",
-  "summary": "",
-  "tags": [],
+  "summary": "Manage multiple Codex accounts in VS Code, switch active sessions, and review quota from one dashboard.",
+  "tags": [
+    "vscode",
+    "codex",
+    "accounts",
+    "extension"
+  ],
   "demoUrl": "",
   "coverImage": ""
 }
